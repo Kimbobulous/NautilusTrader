@@ -7,18 +7,18 @@
 
 ### Configuration and CLI
 
-- [ ] **CLI-01**: User can run separate `ingest`, `backtest`, and `optimize` commands without rerunning unrelated steps
-- [ ] **CLI-02**: User can configure data, catalog, and results paths through config files instead of source-code path edits
-- [ ] **CLI-03**: User can run the project locally on Windows PowerShell using the existing `uv` and `.venv` workflow
+- [x] **CLI-01**: User can run separate `ingest`, `backtest`, and `optimize` commands without rerunning unrelated steps
+- [x] **CLI-02**: User can configure data, catalog, and results paths through config files instead of source-code path edits
+- [x] **CLI-03**: User can run the project locally on Windows PowerShell using the existing `uv` and `.venv` workflow
 
 ### Data Ingestion
 
-- [ ] **DATA-01**: User can load Databento instrument definition files into a Nautilus Parquet catalog before market data is written
-- [ ] **DATA-02**: User can load MGC 1-minute OHLCV bar data from existing local Databento files into the catalog
-- [ ] **DATA-03**: User can load MGC trade tick data from existing local Databento files into the catalog
-- [ ] **DATA-04**: User receives ingestion confirmation showing counts written for definitions, bars, and trades
-- [ ] **DATA-05**: User receives the catalog date range for the loaded MGC data
-- [ ] **DATA-06**: User receives data-quality warnings for missing files, empty loads, or obvious continuity issues
+- [x] **DATA-01**: User can load Databento instrument definition files into a Nautilus Parquet catalog before market data is written
+- [x] **DATA-02**: User can load MGC 1-minute OHLCV bar data from existing local Databento files into the catalog
+- [x] **DATA-03**: User can load MGC trade tick data from existing local Databento files into the catalog
+- [x] **DATA-04**: User receives ingestion confirmation showing counts written for definitions, bars, and trades
+- [x] **DATA-05**: User receives the catalog date range for the loaded MGC data
+- [x] **DATA-06**: User receives data-quality warnings for missing files, empty loads, or obvious continuity issues
 
 ### Backtesting
 
@@ -77,15 +77,15 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLI-01 | Phase 1 | Pending |
-| CLI-02 | Phase 1 | Pending |
-| CLI-03 | Phase 1 | Pending |
-| DATA-01 | Phase 1 | Pending |
-| DATA-02 | Phase 1 | Pending |
-| DATA-03 | Phase 1 | Pending |
-| DATA-04 | Phase 1 | Pending |
-| DATA-05 | Phase 1 | Pending |
-| DATA-06 | Phase 1 | Pending |
+| CLI-01 | Phase 1 | Completed |
+| CLI-02 | Phase 1 | Completed |
+| CLI-03 | Phase 1 | Completed |
+| DATA-01 | Phase 1 | Completed |
+| DATA-02 | Phase 1 | Completed |
+| DATA-03 | Phase 1 | Completed |
+| DATA-04 | Phase 1 | Completed |
+| DATA-05 | Phase 1 | Completed |
+| DATA-06 | Phase 1 | Completed |
 | BT-01 | Phase 2 | Pending |
 | BT-02 | Phase 2 | Pending |
 | BT-03 | Phase 2 | Pending |
@@ -111,4 +111,4 @@
 
 ---
 *Requirements defined: 2026-04-08*
-*Last updated: 2026-04-08 after initial definition*
+*Last updated: 2026-04-08 after Phase 1 completion*

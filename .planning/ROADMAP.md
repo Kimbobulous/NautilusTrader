@@ -10,7 +10,7 @@ This roadmap builds the system in dependency order: first establish a clean loca
 - Integer phases (1, 2, 3): Planned milestone work
 - Decimal phases (2.1, 2.2): Urgent insertions if needed later
 
-- [ ] **Phase 1: Catalog Foundation** - Build the project skeleton, config system, CLI shell, and validated Databento catalog ingestion
+- [x] **Phase 1: Catalog Foundation** - Build the project skeleton, config system, CLI shell, and validated Databento catalog ingestion (completed 2026-04-08)
 - [ ] **Phase 2: Backtest Runner** - Wire Nautilus backtest execution, venue assumptions, and reporting outputs
 - [ ] **Phase 3: Strategy Logic** - Implement the MGC trend-following pullback strategy inside Nautilus event handlers
 - [ ] **Phase 4: Optimization Workflow** - Add Optuna parameter search with ranked outputs and best-run artifacts
@@ -30,9 +30,9 @@ This roadmap builds the system in dependency order: first establish a clean loca
 **Plans**: 3 plans
 
 Plans:
-- [ ] 01-01: Scaffold the Python package, CLI entry points, and config model
-- [ ] 01-02: Implement Databento file discovery and Nautilus catalog ingestion
-- [ ] 01-03: Add catalog validation and ingestion reporting
+- [x] 01-01: Scaffold the Python package, CLI entry points, and config model
+- [x] 01-02: Implement Databento file discovery and Nautilus catalog ingestion
+- [x] 01-03: Add catalog validation and ingestion reporting
 
 ### Phase 2: Backtest Runner
 **Goal**: Deliver a trustworthy Nautilus backtest runner with configured venue assumptions, cost model, and saved artifacts for a single parameter set.
@@ -105,7 +105,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Catalog Foundation | 0/3 | Not started | - |
+| 1. Catalog Foundation | 3/3 | Complete    | 2026-04-08 |
 | 2. Backtest Runner | 0/3 | Not started | - |
 | 3. Strategy Logic | 0/4 | Not started | - |
 | 4. Optimization Workflow | 0/3 | Not started | - |
