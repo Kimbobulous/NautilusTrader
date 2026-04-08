@@ -11,7 +11,7 @@ This roadmap builds the system in dependency order: first establish a clean loca
 - Decimal phases (2.1, 2.2): Urgent insertions if needed later
 
 - [x] **Phase 1: Catalog Foundation** - Build the project skeleton, config system, CLI shell, and validated Databento catalog ingestion (completed 2026-04-08)
-- [ ] **Phase 2: Backtest Runner** - Wire Nautilus backtest execution, venue assumptions, and reporting outputs
+- [x] **Phase 2: Backtest Runner** - Wire Nautilus backtest execution, venue assumptions, and reporting outputs (completed 2026-04-08)
 - [ ] **Phase 3: Strategy Logic** - Implement the MGC trend-following pullback strategy inside Nautilus event handlers
 - [ ] **Phase 4: Optimization Workflow** - Add Optuna parameter search with ranked outputs and best-run artifacts
 - [ ] **Phase 5: Validation and Hardening** - Add regression checks, data validations, and operator-facing safeguards for reliable local use
@@ -46,9 +46,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 02-01: Build the Nautilus backtest configuration and venue setup
-- [ ] 02-02: Implement result extraction, summary metrics, and trade-log export
-- [ ] 02-03: Add equity-curve generation and results directory management
+- [x] 02-01: Build the Nautilus backtest configuration and venue setup
+- [x] 02-02: Implement result extraction, summary metrics, and trade-log export
+- [x] 02-03: Add equity-curve generation and results directory management
 
 ### Phase 3: Strategy Logic
 **Goal**: Implement the full rule-based MGC strategy using Nautilus `Strategy` lifecycle methods and completed 1-minute bar evaluation.
@@ -106,7 +106,7 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Catalog Foundation | 3/3 | Complete    | 2026-04-08 |
-| 2. Backtest Runner | 0/3 | Not started | - |
+| 2. Backtest Runner | 3/3 | Complete    | 2026-04-08 |
 | 3. Strategy Logic | 0/4 | Not started | - |
 | 4. Optimization Workflow | 0/3 | Not started | - |
 | 5. Validation and Hardening | 0/3 | Not started | - |

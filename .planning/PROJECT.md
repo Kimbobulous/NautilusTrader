@@ -16,10 +16,11 @@ Reliable MGC data ingestion and trustworthy event-driven backtests that make opt
 
 - [x] Load 5 years of Databento MGC bars, trades, and instrument definitions into a Nautilus Parquet catalog
   Validated in Phase 1: Catalog Foundation
+- [x] Run a catalog-backed Nautilus backtest through a reusable Python runner and CLI, with saved metrics/trade/artifact outputs
+  Validated in Phase 2: Backtest Runner
 
 ### Active
 
-- [ ] Run an event-driven Nautilus backtest for a rule-based MGC trend-following pullback strategy
 - [ ] Optimize strategy parameters with Optuna and produce ranked results plus an equity curve for the best run
 
 ### Out of Scope
@@ -65,7 +66,7 @@ The local documentation folder `nt_docs/` is a required reference source before 
 | Prioritize ingestion before backtesting and optimization | Clean data is the foundation for everything else | Phase 1 delivered the catalog workflow before any backtest or optimization work |
 | Use separate `ingest`, `backtest`, and `optimize` commands | Enables focused daily workflows and avoids unnecessary reruns | Phase 1 established the CLI contract and implemented `ingest` |
 | Use Nautilus Trader's event-driven `Strategy` architecture | Matches the engine's actual design and avoids invalid vectorized implementations | Phase 1 kept the foundation catalog-first and ready for Nautilus-native backtesting |
-| Include commissions and slippage from v1 | Backtest trust matters more than optimistic raw signal results | - Pending |
+| Include commissions and slippage from v1 | Backtest trust matters more than optimistic raw signal results | Phase 2 implements commission, one-tick slippage, and next-bar timing through Nautilus-native venue/fill/latency configuration |
 | Keep v1 to MGC futures, rule-based logic, and local Databento files only | Prevents scope creep while establishing a credible research baseline | Phase 1 filters the catalog to outright MGC futures contracts and local Databento files only |
 
 ## Evolution
@@ -86,4 +87,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-08 after Phase 1 execution*
+*Last updated: 2026-04-08 after Phase 2 execution*

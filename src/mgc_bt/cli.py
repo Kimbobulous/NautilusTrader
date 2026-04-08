@@ -48,6 +48,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(render_ingest_cli_output(result))
             return 0
         if args.command == "backtest":
+            from mgc_bt.backtest.artifacts import write_backtest_artifacts
             from mgc_bt.backtest.runner import run_backtest
 
             result = run_backtest(
@@ -58,7 +59,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                     "end_date": getattr(args, "end_date", None),
                 },
             )
-            print(_render_backtest_summary(result))
+            artifact_paths = write_backtest_artifacts(settings, result)
+            print(_render_backtest_summary(result, artifact_paths))
             return 0
 
         raise CLIError(f"The '{args.command}' command is not implemented yet.")
@@ -79,16 +81,18 @@ def _normalize_global_options(argv: list[str] | None) -> list[str] | None:
     return option + remaining
 
 
-def _render_backtest_summary(result: dict[str, object]) -> str:
-    return "\n".join(
-        [
-            f"Mode: {result['mode']}",
-            f"Instrument: {result['instrument_id']}",
-            f"Date range: {result['start_date']} -> {result['end_date']}",
-            f"Total PnL: {result['total_pnl']}",
-            f"Sharpe ratio: {result['sharpe_ratio']}",
-            f"Win rate: {result['win_rate']}",
-            f"Max drawdown: {result['max_drawdown']}",
-            f"Total trades: {result['total_trades']}",
-        ],
-    )
+def _render_backtest_summary(result: dict[str, object], artifact_paths: dict[str, Path] | None = None) -> str:
+    lines = [
+        f"Mode: {result['mode']}",
+        f"Instrument: {result['instrument_id']}",
+        f"Date range: {result['start_date']} -> {result['end_date']}",
+        f"Total PnL: {result['total_pnl']}",
+        f"Sharpe ratio: {result['sharpe_ratio']}",
+        f"Win rate: {result['win_rate']}",
+        f"Max drawdown: {result['max_drawdown']}",
+        f"Total trades: {result['total_trades']}",
+    ]
+    if artifact_paths is not None:
+        lines.append(f"Run directory: {artifact_paths['run_dir']}")
+        lines.append(f"Latest directory: {artifact_paths['latest_dir']}")
+    return "\n".join(lines)

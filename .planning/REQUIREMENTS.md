@@ -22,13 +22,13 @@
 
 ### Backtesting
 
-- [ ] **BT-01**: User can run a Nautilus event-driven backtest against catalog-backed MGC data using a `Strategy` implementation
-- [ ] **BT-02**: Strategy signals are evaluated on completed 1-minute bars only in v1
-- [ ] **BT-03**: Backtests include approximately `$0.50` commission per side
-- [ ] **BT-04**: Backtests include `1` tick (`$0.10`) slippage per fill
-- [ ] **BT-05**: User receives a trade log for each backtest run
-- [ ] **BT-06**: User receives summary metrics including total PnL, Sharpe ratio, win rate, max drawdown, and total trades
-- [ ] **BT-07**: User receives an equity curve saved as a PNG for each completed backtest run
+- [x] **BT-01**: User can run a Nautilus event-driven backtest against catalog-backed MGC data using a `Strategy` implementation
+- [x] **BT-02**: Strategy signals are evaluated on completed 1-minute bars only in v1
+- [x] **BT-03**: Backtests include approximately `$0.50` commission per side
+- [x] **BT-04**: Backtests include `1` tick (`$0.10`) slippage per fill
+- [x] **BT-05**: User receives a trade log for each backtest run
+- [x] **BT-06**: User receives summary metrics including total PnL, Sharpe ratio, win rate, max drawdown, and total trades
+- [x] **BT-07**: User receives an equity curve saved as a PNG for each completed backtest run
 
 ### Strategy Logic
 
@@ -86,13 +86,13 @@
 | DATA-04 | Phase 1 | Completed |
 | DATA-05 | Phase 1 | Completed |
 | DATA-06 | Phase 1 | Completed |
-| BT-01 | Phase 2 | Pending |
-| BT-02 | Phase 2 | Pending |
-| BT-03 | Phase 2 | Pending |
-| BT-04 | Phase 2 | Pending |
-| BT-05 | Phase 2 | Pending |
-| BT-06 | Phase 2 | Pending |
-| BT-07 | Phase 2 | Pending |
+| BT-01 | Phase 2 | Completed |
+| BT-02 | Phase 2 | Completed |
+| BT-03 | Phase 2 | Completed |
+| BT-04 | Phase 2 | Completed |
+| BT-05 | Phase 2 | Completed |
+| BT-06 | Phase 2 | Completed |
+| BT-07 | Phase 2 | Completed |
 | STRAT-01 | Phase 3 | Pending |
 | STRAT-02 | Phase 3 | Pending |
 | STRAT-03 | Phase 3 | Pending |

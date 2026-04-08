@@ -48,7 +48,14 @@ def test_cli_backtest_uses_shared_runner(monkeypatch, capsys) -> None:
             "total_trades": 4,
         }
 
+    def fake_write_backtest_artifacts(settings, result):
+        return {
+            "run_dir": "results/backtests/2026-04-08_120000",
+            "latest_dir": "results/backtests/latest",
+        }
+
     monkeypatch.setattr("mgc_bt.backtest.runner.run_backtest", fake_run_backtest)
+    monkeypatch.setattr("mgc_bt.backtest.artifacts.write_backtest_artifacts", fake_write_backtest_artifacts)
 
     exit_code = main(
         [
@@ -67,3 +74,4 @@ def test_cli_backtest_uses_shared_runner(monkeypatch, capsys) -> None:
     assert captured_params["instrument_id"] == "MGCM4.GLBX"
     assert "Mode: single_contract" in stdout
     assert "Instrument: MGCM4.GLBX" in stdout
+    assert "Run directory: results/backtests/2026-04-08_120000" in stdout
