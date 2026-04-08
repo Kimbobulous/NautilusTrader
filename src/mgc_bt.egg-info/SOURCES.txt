@@ -1,0 +1,12 @@
+README.md
+pyproject.toml
+src/mgc_bt/__init__.py
+src/mgc_bt/__main__.py
+src/mgc_bt/cli.py
+src/mgc_bt/config.py
+src/mgc_bt.egg-info/PKG-INFO
+src/mgc_bt.egg-info/SOURCES.txt
+src/mgc_bt.egg-info/dependency_links.txt
+src/mgc_bt.egg-info/requires.txt
+src/mgc_bt.egg-info/top_level.txt
+tests/test_cli.py

@@ -1,1 +1,7 @@
 nt_docs/
+catalog/
+results/
+catalog_test*/
+.pytest_cache/
+__pycache__/
+*.pyc

@@ -1,0 +1,28 @@
+[paths]
+project_root = "."
+data_root = "C:/dev/mgc-data"
+catalog_root = "catalog"
+results_root = "results"
+
+[ingestion]
+dataset = "GLBX.MDP3"
+symbol = "MGC"
+bar_schema = "ohlcv-1m"
+trade_schema = "trades"
+definition_schema = "definition"
+load_definitions = true
+load_bars = true
+load_trades = true
+load_mbp1 = false
+definitions_glob = "definitions/*.definition.dbn.zst"
+bars_glob = "ohcl-1m/*.ohlcv-1m.dbn.zst"
+trades_glob = "Trades/*.trades.dbn.zst"
+mbp1_glob = "MBP-1_03.09.2021-11.09.2023/*.mbp-1.dbn.zst"
+
+[backtest]
+commission_per_side = 0.50
+slippage_ticks = 1
+
+[optimization]
+study_name = "mgc-optuna"
+direction = "maximize"
