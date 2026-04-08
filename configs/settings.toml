@@ -20,6 +20,19 @@ trades_glob = "Trades/*.trades.dbn.zst"
 mbp1_glob = "MBP-1_03.09.2021-11.09.2023/*.mbp-1.dbn.zst"
 
 [backtest]
+default_mode = "auto_roll"
+venue_name = "GLBX"
+oms_type = "NETTING"
+account_type = "MARGIN"
+base_currency = "USD"
+starting_balance = "50000 USD"
+default_leverage = 1.0
+trade_size = "1"
+results_subdir = "backtests"
+roll_preference = "open_interest"
+calendar_roll_business_days = 5
+start_date = ""
+end_date = ""
 commission_per_side = 0.50
 slippage_ticks = 1
 

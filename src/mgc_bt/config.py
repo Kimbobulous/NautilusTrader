@@ -36,6 +36,19 @@ class IngestionConfig:
 
 @dataclass(frozen=True)
 class BacktestConfig:
+    default_mode: str
+    venue_name: str
+    oms_type: str
+    account_type: str
+    base_currency: str
+    starting_balance: str
+    default_leverage: float
+    trade_size: str
+    results_subdir: str
+    roll_preference: str
+    calendar_roll_business_days: int
+    start_date: str | None
+    end_date: str | None
     commission_per_side: float
     slippage_ticks: int
 
@@ -102,6 +115,19 @@ def load_settings(config_path: str | Path) -> Settings:
             mbp1_glob=str(_require(ingestion, "mbp1_glob", "ingestion")),
         ),
         backtest=BacktestConfig(
+            default_mode=str(_require(backtest, "default_mode", "backtest")),
+            venue_name=str(_require(backtest, "venue_name", "backtest")),
+            oms_type=str(_require(backtest, "oms_type", "backtest")),
+            account_type=str(_require(backtest, "account_type", "backtest")),
+            base_currency=str(_require(backtest, "base_currency", "backtest")),
+            starting_balance=str(_require(backtest, "starting_balance", "backtest")),
+            default_leverage=float(_require(backtest, "default_leverage", "backtest")),
+            trade_size=str(_require(backtest, "trade_size", "backtest")),
+            results_subdir=str(_require(backtest, "results_subdir", "backtest")),
+            roll_preference=str(_require(backtest, "roll_preference", "backtest")),
+            calendar_roll_business_days=int(_require(backtest, "calendar_roll_business_days", "backtest")),
+            start_date=_optional_str(backtest.get("start_date")),
+            end_date=_optional_str(backtest.get("end_date")),
             commission_per_side=float(_require(backtest, "commission_per_side", "backtest")),
             slippage_ticks=int(_require(backtest, "slippage_ticks", "backtest")),
         ),
@@ -131,3 +157,10 @@ def _require(section: dict, key: str, name: str) -> object:
     if key not in section:
         raise ConfigError(f"Missing required key '{key}' in [{name}]")
     return section[key]
+
+
+def _optional_str(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None

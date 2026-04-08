@@ -25,7 +25,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("ingest", help="Load Databento data into the Nautilus catalog.")
-    subparsers.add_parser("backtest", help="Run a catalog-backed Nautilus backtest.")
+    backtest_parser = subparsers.add_parser("backtest", help="Run a catalog-backed Nautilus backtest.")
+    backtest_parser.add_argument("--instrument-id", help="Run a single-contract backtest for this specific instrument.")
+    backtest_parser.add_argument("--start-date", help="Override the configured UTC start date for the run.")
+    backtest_parser.add_argument("--end-date", help="Override the configured UTC end date for the run.")
     subparsers.add_parser("optimize", help="Run Optuna parameter optimization.")
     return parser
 
@@ -44,6 +47,19 @@ def main(argv: Sequence[str] | None = None) -> int:
             result = run_ingest(settings)
             print(render_ingest_cli_output(result))
             return 0
+        if args.command == "backtest":
+            from mgc_bt.backtest.runner import run_backtest
+
+            result = run_backtest(
+                settings,
+                {
+                    "instrument_id": getattr(args, "instrument_id", None),
+                    "start_date": getattr(args, "start_date", None),
+                    "end_date": getattr(args, "end_date", None),
+                },
+            )
+            print(_render_backtest_summary(result))
+            return 0
 
         raise CLIError(f"The '{args.command}' command is not implemented yet.")
     except (CLIError, ConfigError) as exc:
@@ -61,3 +77,18 @@ def _normalize_global_options(argv: list[str] | None) -> list[str] | None:
     option = argv[index : index + 2]
     remaining = argv[:index] + argv[index + 2 :]
     return option + remaining
+
+
+def _render_backtest_summary(result: dict[str, object]) -> str:
+    return "\n".join(
+        [
+            f"Mode: {result['mode']}",
+            f"Instrument: {result['instrument_id']}",
+            f"Date range: {result['start_date']} -> {result['end_date']}",
+            f"Total PnL: {result['total_pnl']}",
+            f"Sharpe ratio: {result['sharpe_ratio']}",
+            f"Win rate: {result['win_rate']}",
+            f"Max drawdown: {result['max_drawdown']}",
+            f"Total trades: {result['total_trades']}",
+        ],
+    )
