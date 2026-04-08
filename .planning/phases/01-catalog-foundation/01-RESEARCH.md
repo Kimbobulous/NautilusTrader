@@ -76,6 +76,20 @@ Implication for planning:
 - Phase 1 should ingest definitions, 1-minute bars, and trades only
 - MBP-1 should be discoverable but ignored by default in v1 ingestion because it is not required by Phase 1 requirements
 
+### 2a. Metadata confirms the actual naming contract
+
+Reading one `metadata.json` file from each folder confirmed these patterns:
+
+- `definitions/metadata.json` uses schema `definition` and daily splitting
+- `ohcl-1m/metadata.json` uses schema `ohlcv-1m` and no duration splitting, which explains the single large bar file
+- `Trades/metadata.json` uses schema `trades` and daily splitting
+- `MBP-1_03.09.2021-11.09.2023/metadata.json` uses schema `mbp-1` and daily splitting
+
+Two execution-relevant details fall out of that:
+
+- The folder is actually named `ohcl-1m`, but the file schema and DBN filename use `ohlcv-1m`; discovery must tolerate the folder typo and trust schema/file suffixes instead of assuming the directory name is canonical.
+- Daily-split folders should expect many `glbx-mdp3-YYYYMMDD.<schema>.dbn.zst` files, while the bar folder currently uses a single date-range filename `glbx-mdp3-YYYYMMDD-YYYYMMDD.ohlcv-1m.dbn.zst`.
+
 ### 3. Local metadata already tells us about data-quality edge cases
 
 The `condition.json` and metadata files under the raw Databento folders show:
