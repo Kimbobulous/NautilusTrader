@@ -56,6 +56,14 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Refresh results/optimization/latest with this run. Without --force, the canonical run folder is written but latest is left untouched.",
     )
+    compare_parser = subparsers.add_parser("compare", help="Run two strategies on the same data window and write a lightweight comparison summary.")
+    compare_parser.add_argument("--strategy-a", required=True, help="Named registry strategy for side A.")
+    compare_parser.add_argument("--strategy-b", required=True, help="Named registry strategy for side B.")
+    compare_parser.add_argument("--strategy-class-a", help="Optional import-path override for side A.")
+    compare_parser.add_argument("--strategy-class-b", help="Optional import-path override for side B.")
+    compare_parser.add_argument("--instrument-id", help="Run both strategies on this specific instrument ID.")
+    compare_parser.add_argument("--start-date", help="Override the configured UTC start date for both runs.")
+    compare_parser.add_argument("--end-date", help="Override the configured UTC end date for both runs.")
     subparsers.add_parser("health", help="Run all ingest, backtest, and optimize preflight checks and summarize local readiness.")
     return parser
 
@@ -145,6 +153,21 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             print(render_health_report(ingest_report, backtest_report, optimize_report))
             return 0
+        if args.command == "compare":
+            from mgc_bt.compare import run_comparison
+
+            result = run_comparison(
+                settings,
+                strategy_a=args.strategy_a,
+                strategy_b=args.strategy_b,
+                strategy_class_a=getattr(args, "strategy_class_a", None),
+                strategy_class_b=getattr(args, "strategy_class_b", None),
+                instrument_id=getattr(args, "instrument_id", None),
+                start_date=getattr(args, "start_date", None),
+                end_date=getattr(args, "end_date", None),
+            )
+            print(_render_compare_summary(result))
+            return 0
 
         raise CLIError(f"The '{args.command}' command is not implemented yet.")
     except (CLIError, ConfigError) as exc:
@@ -230,6 +253,19 @@ def _render_optimization_summary(result: dict[str, object]) -> str:
     elif result.get("stability_status") == "not_requested":
         lines.append("Stability: not requested")
     return "\n".join(lines)
+
+
+def _render_compare_summary(result: dict[str, object]) -> str:
+    return "\n".join(
+        [
+            f"Comparison directory: {result['comparison_dir']}",
+            f"Strategy A run directory: {result['strategy_a_run_dir']}",
+            f"Strategy B run directory: {result['strategy_b_run_dir']}",
+            f"Comparison summary: {result['comparison_summary_path']}",
+            f"Metrics delta: {result['metrics_delta_path']}",
+            f"Comparison tearsheet: {result['comparison_tearsheet_path']}",
+        ],
+    )
 
 
 def _raise_on_preflight_failures(report) -> None:

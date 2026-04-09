@@ -46,6 +46,22 @@ def test_parser_registers_expected_subcommands() -> None:
     health_args = parser.parse_args(["health"])
     assert health_args.command == "health"
 
+    compare_args = parser.parse_args(
+        [
+            "compare",
+            "--strategy-a",
+            "mgc_production",
+            "--strategy-b",
+            "mgc_production",
+            "--instrument-id",
+            "MGCJ1.GLBX",
+        ],
+    )
+    assert compare_args.command == "compare"
+    assert compare_args.strategy_a == "mgc_production"
+    assert compare_args.strategy_b == "mgc_production"
+    assert compare_args.instrument_id == "MGCJ1.GLBX"
+
 
 def test_settings_loader_uses_expected_sections() -> None:
     settings = load_settings("configs/settings.toml")
@@ -390,3 +406,40 @@ def test_cli_health_summarizes_ready_missing_and_attention(monkeypatch, capsys) 
     assert "ingest: ATTENTION" in stdout
     assert "backtest: MISSING" in stdout
     assert "optimize: READY" in stdout
+
+
+def test_cli_compare_uses_dedicated_comparison_runner(monkeypatch, capsys) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run_comparison(settings, **kwargs):
+        captured.update(kwargs)
+        return {
+            "comparison_dir": "results/comparisons/2026-04-09_000000",
+            "strategy_a_run_dir": "results/backtests/2026-04-09_000000_strategy_a",
+            "strategy_b_run_dir": "results/backtests/2026-04-09_000000_strategy_b",
+            "comparison_summary_path": "results/comparisons/2026-04-09_000000/comparison_summary.json",
+            "metrics_delta_path": "results/comparisons/2026-04-09_000000/metrics_delta.csv",
+            "comparison_tearsheet_path": "results/comparisons/2026-04-09_000000/comparison_tearsheet.html",
+        }
+
+    monkeypatch.setattr("mgc_bt.compare.run_comparison", fake_run_comparison)
+
+    exit_code = main(
+        [
+            "compare",
+            "--strategy-a",
+            "mgc_production",
+            "--strategy-b",
+            "mgc_production",
+            "--instrument-id",
+            "MGCJ1.GLBX",
+        ],
+    )
+    stdout = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert captured["strategy_a"] == "mgc_production"
+    assert captured["strategy_b"] == "mgc_production"
+    assert captured["instrument_id"] == "MGCJ1.GLBX"
+    assert "Comparison directory: results/comparisons/2026-04-09_000000" in stdout
+    assert "Comparison tearsheet: results/comparisons/2026-04-09_000000/comparison_tearsheet.html" in stdout

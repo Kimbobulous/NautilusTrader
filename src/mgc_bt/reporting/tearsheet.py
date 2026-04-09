@@ -17,7 +17,7 @@ from mgc_bt.reporting.loaders import TearsheetPayload
 from mgc_bt.reporting.loaders import load_tearsheet_payload
 
 
-class _ChartEmbedder:
+class ChartEmbedder:
     def __init__(self) -> None:
         self._included_bundle = False
 
@@ -43,7 +43,7 @@ def write_tearsheet(run_dir: Path | str) -> Path:
 
 
 def render_tearsheet(payload: TearsheetPayload) -> str:
-    embedder = _ChartEmbedder()
+    embedder = ChartEmbedder()
     sections = [
         _render_header(payload),
         _render_executive_summary(payload),
@@ -57,12 +57,16 @@ def render_tearsheet(payload: TearsheetPayload) -> str:
         sections.append(_render_optimization_section(payload, embedder))
     sections.append(_render_footer(payload))
     body = "\n".join(sections)
+    return render_html_document(title="tearsheet.html", body=body)
+
+
+def render_html_document(*, title: str, body: str) -> str:
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>tearsheet.html</title>
+  <title>{html.escape(title)}</title>
   <style>
     :root {{
       --bg: #0b1220;
@@ -156,7 +160,7 @@ def _render_executive_summary(payload: TearsheetPayload) -> str:
 </section>"""
 
 
-def _render_equity_section(payload: TearsheetPayload, embedder: _ChartEmbedder) -> str:
+def _render_equity_section(payload: TearsheetPayload, embedder: ChartEmbedder) -> str:
     content = _section_start("section-equity", "Equity curve")
     if not payload.underwater_curve:
         content += _notice(payload.notices.get("underwater_curve.csv", "Section unavailable - underwater_curve.csv not found"))
@@ -172,7 +176,7 @@ def _render_equity_section(payload: TearsheetPayload, embedder: _ChartEmbedder) 
     return content + _section_end()
 
 
-def _render_drawdown_section(payload: TearsheetPayload, embedder: _ChartEmbedder) -> str:
+def _render_drawdown_section(payload: TearsheetPayload, embedder: ChartEmbedder) -> str:
     content = _section_start("section-drawdown", "Drawdown analysis")
     if not payload.underwater_curve:
         content += _notice(payload.notices.get("underwater_curve.csv", "Section unavailable - underwater_curve.csv not found"))
@@ -190,7 +194,7 @@ def _render_drawdown_section(payload: TearsheetPayload, embedder: _ChartEmbedder
     return content + _section_end()
 
 
-def _render_trade_analysis(payload: TearsheetPayload, embedder: _ChartEmbedder) -> str:
+def _render_trade_analysis(payload: TearsheetPayload, embedder: ChartEmbedder) -> str:
     content = _section_start("section-trades", "Trade analysis")
     if not payload.trades:
         content += _notice(payload.notices.get("trades.csv", "Section unavailable - trades.csv not found"))
@@ -212,7 +216,7 @@ def _render_trade_analysis(payload: TearsheetPayload, embedder: _ChartEmbedder) 
     return content + _section_end()
 
 
-def _render_breakdowns(payload: TearsheetPayload, embedder: _ChartEmbedder) -> str:
+def _render_breakdowns(payload: TearsheetPayload, embedder: ChartEmbedder) -> str:
     content = _section_start("section-breakdowns", "Performance breakdowns")
     chart_blocks: list[str] = []
     for key, title in [("by_session", "By session"), ("by_volatility_regime", "By volatility regime"), ("by_day_of_week", "By day of week"), ("by_hour", "By hour")]:
@@ -234,7 +238,7 @@ def _render_breakdowns(payload: TearsheetPayload, embedder: _ChartEmbedder) -> s
     return content + _section_end()
 
 
-def _render_audit_diagnostics(payload: TearsheetPayload, embedder: _ChartEmbedder) -> str:
+def _render_audit_diagnostics(payload: TearsheetPayload, embedder: ChartEmbedder) -> str:
     content = _section_start("section-audit", "Audit diagnostics")
     if not payload.audit_log:
         content += _notice(payload.notices.get("audit_log.csv", "Section unavailable - audit_log.csv not found"))
@@ -262,7 +266,7 @@ def _render_audit_diagnostics(payload: TearsheetPayload, embedder: _ChartEmbedde
     return content + _section_end()
 
 
-def _render_optimization_section(payload: TearsheetPayload, embedder: _ChartEmbedder) -> str:
+def _render_optimization_section(payload: TearsheetPayload, embedder: ChartEmbedder) -> str:
     content = _section_start("section-optimization", "Optimization sections")
     blocks: list[str] = []
     blocks.append(_optimization_ranked_block(payload, embedder))
@@ -274,7 +278,7 @@ def _render_optimization_section(payload: TearsheetPayload, embedder: _ChartEmbe
     return content + _section_end()
 
 
-def _optimization_ranked_block(payload: TearsheetPayload, embedder: _ChartEmbedder) -> str:
+def _optimization_ranked_block(payload: TearsheetPayload, embedder: ChartEmbedder) -> str:
     if not payload.ranked_results:
         return f'<div class="card">{_notice(payload.notices.get("ranked_results.csv", "Section unavailable - ranked_results.csv not found"))}</div>'
     top_rows = payload.ranked_results[:10]
@@ -283,7 +287,7 @@ def _optimization_ranked_block(payload: TearsheetPayload, embedder: _ChartEmbedd
     return f'<div class="card"><h3>Ranked results</h3>{embedder.render(fig, div_id="opt-ranked")}</div>'
 
 
-def _optimization_walk_forward_block(payload: TearsheetPayload, embedder: _ChartEmbedder) -> str:
+def _optimization_walk_forward_block(payload: TearsheetPayload, embedder: ChartEmbedder) -> str:
     if not payload.walk_forward_windows:
         return f'<div class="card"><h3>Walk-forward</h3>{_notice(payload.notices.get("window_results.csv", "Section unavailable - window_results.csv not found"))}</div>'
     fig = go.Figure([go.Bar(x=[row["window_index"] for row in payload.walk_forward_windows], y=[_to_float(row.get("test_sharpe")) for row in payload.walk_forward_windows], marker={"color": "#4fc3f7"})])
@@ -291,7 +295,7 @@ def _optimization_walk_forward_block(payload: TearsheetPayload, embedder: _Chart
     return f'<div class="card"><h3>Walk-forward</h3>{embedder.render(fig, div_id="opt-wf")}</div>'
 
 
-def _optimization_monte_carlo_block(payload: TearsheetPayload, embedder: _ChartEmbedder) -> str:
+def _optimization_monte_carlo_block(payload: TearsheetPayload, embedder: ChartEmbedder) -> str:
     if not payload.monte_carlo_confidence_bands:
         return f'<div class="card"><h3>Monte Carlo</h3>{_notice(payload.notices.get("equity_confidence_bands.csv", "Section unavailable - equity_confidence_bands.csv not found"))}</div>'
     rows = payload.monte_carlo_confidence_bands
@@ -304,7 +308,7 @@ def _optimization_monte_carlo_block(payload: TearsheetPayload, embedder: _ChartE
     return f'<div class="card"><h3>Monte Carlo</h3>{embedder.render(fig, div_id="opt-mc")}</div>'
 
 
-def _optimization_stability_block(payload: TearsheetPayload, embedder: _ChartEmbedder) -> str:
+def _optimization_stability_block(payload: TearsheetPayload, embedder: ChartEmbedder) -> str:
     if not payload.stability_heatmap_rows:
         return f'<div class="card"><h3>Parameter heatmap</h3>{_notice(payload.notices.get("top_pair_heatmap.csv", "Section unavailable - top_pair_heatmap.csv not found"))}</div>'
     xs = sorted({row["value_x"] for row in payload.stability_heatmap_rows})
@@ -320,7 +324,7 @@ def _optimization_stability_block(payload: TearsheetPayload, embedder: _ChartEmb
     return f'<div class="card"><h3>Parameter heatmap</h3>{embedder.render(fig, div_id="opt-heatmap")}</div>'
 
 
-def _optimization_sensitivity_block(payload: TearsheetPayload, embedder: _ChartEmbedder) -> str:
+def _optimization_sensitivity_block(payload: TearsheetPayload, embedder: ChartEmbedder) -> str:
     if not payload.parameter_sensitivity:
         return f'<div class="card"><h3>Parameter sensitivity</h3>{_notice(payload.notices.get("parameter_sensitivity.csv", "Section unavailable - parameter_sensitivity.csv not found"))}</div>'
     rows = payload.parameter_sensitivity
