@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: complete
-stopped_at: Phase 5 completed
-last_updated: "2026-04-09T03:35:00.000Z"
-last_activity: 2026-04-09 - Phase 5 completed
+status: milestone_complete
+stopped_at: v1.0 archived
+last_updated: "2026-04-09T04:00:00.000Z"
+last_activity: 2026-04-09 - v1.0 archived, ready for next milestone
 progress:
   total_phases: 5
   completed_phases: 5
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Reliable MGC data ingestion and trustworthy event-driven backtests that make optimization results credible enough to act on.
-**Current focus:** Milestone complete
+**Current focus:** Ready for next milestone
 
 ## Current Position
 
-Phase: 5 of 5 (Validation and Hardening)
-Plan: 3 of 3 in current phase
-Status: Complete
-Last activity: 2026-04-09 - Phase 5 completed
+Phase: Milestone archived
+Plan: 17 of 17 completed in archived milestone
+Status: Ready for next milestone
+Last activity: 2026-04-09 - v1.0 archived, ready for next milestone
 
 Progress: [##########] 100%
 
@@ -73,6 +73,7 @@ Recent decisions affecting current work:
 - Phase 5: Shared preflight validation powers ingest, backtest, optimize, and the `health` command
 - Phase 5: Result manifests and explicit `--force` control protect repeated local runs from accidental `latest/` overwrites
 - Phase 5: Repeated in-process backtest runs retain a shared Nautilus log guard for local optimization stability
+- Milestone v1.0: Roadmap and requirements archived to `.planning/milestones/`
 
 ### Pending Todos
 
@@ -87,6 +88,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-04-09 03:35
-Stopped at: Phase 5 completed
+Last session: 2026-04-09 04:00
+Stopped at: v1.0 archived
 Resume file: .planning/ROADMAP.md

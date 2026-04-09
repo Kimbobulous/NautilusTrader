@@ -27,7 +27,17 @@ Reliable MGC data ingestion and trustworthy event-driven backtests that make opt
 
 ### Active
 
-- [ ] No active v1 requirements remain
+- [ ] Define v1.1 goals and requirements
+
+## Current State
+
+v1.0 is shipped. The repo now contains a complete local MGC research workflow with catalog ingestion, reusable backtesting, production strategy logic, optimization, and workflow hardening for repeated local use.
+
+## Next Milestone Goals
+
+- Define what should be tackled after the v1.0 baseline
+- Decide whether the next focus is execution realism, richer strategy logic, broader analytics, or workflow scale
+- Create a fresh requirements set instead of extending the archived v1.0 scope in place
 
 ### Out of Scope
 
@@ -96,4 +106,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-09 after Phase 5 execution*
+*Last updated: 2026-04-09 after v1.0 milestone completion*
