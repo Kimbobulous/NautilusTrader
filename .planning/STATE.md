@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: quant research infrastructure
-status: ready_for_next_phase
-stopped_at: Phase 6 execution complete
-last_updated: "2026-04-09T06:10:00.000Z"
-last_activity: 2026-04-09 - Phase 6 complete, Phase 7 ready to discuss
+status: phase_context_gathered
+stopped_at: Phase 7 discussion complete
+last_updated: "2026-04-10T02:40:00.000Z"
+last_activity: 2026-04-09 - Phase 7 context captured, ready to plan
 progress:
   total_phases: 4
   completed_phases: 1
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-08)
 ## Current Position
 
 Phase: 7 - Analytics and Audit Layer
-Plan: Discussion/planning not started
-Status: Ready for next phase
-Last activity: 2026-04-09 - Phase 6 execution complete, research integrity layer shipped
+Plan: Context gathered
+Status: Ready for planning
+Last activity: 2026-04-09 - Phase 7 discussion completed and decisions locked
 
 Progress: [###-------] 25%
 
@@ -78,6 +78,9 @@ Recent decisions affecting current work:
 - Milestone v1.1: Preserve v1.0 behavior while adding research-integrity, analytics, visualization, and reuse layers
 - Phase 6: Walk-forward, Monte Carlo, and stability analysis extend `optimize` without changing the default no-flag path
 - Phase 6: Optuna fANOVA requires `scikit-learn` in the local venv; installed via `uv pip install scikit-learn`
+- Phase 7: Analytics must generate automatically after `backtest` and `optimize`, but analytics failures must warn and never block core result persistence
+- Phase 7: Audit logs must capture every `PULLBACK_ARMED` setup considered, not just executed trades
+- Phase 7: Phase 8 tearsheets should read analytics from filesystem artifacts under `analytics/` rather than rerunning backtests
 
 ### Pending Todos
 
@@ -93,9 +96,10 @@ Recent decisions affecting current work:
 - Phase 6: Keep the current `optimize` path intact by default; walk-forward, Monte Carlo, and stability analysis should extend it without replacing it
 - Phase 6: Final test evaluation must stay hidden unless explicitly requested
 - Phase 7 should build on the new `walk_forward/`, `monte_carlo/`, and `stability/` artifacts rather than recreating those calculations
+- Phase 7 analytics should stream large CSV outputs efficiently and avoid giant in-memory dataframe dumps for five-year runs
 
 ## Session Continuity
 
 Last session: 2026-04-09 01:00
-Stopped at: Phase 6 execution complete
+Stopped at: Phase 7 discussion complete
 Resume file: .planning/ROADMAP.md
