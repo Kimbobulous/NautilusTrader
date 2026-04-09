@@ -12,6 +12,17 @@ Always use `nautilus_trader`'s native infrastructure as the foundation. Extend a
 
 Reliable MGC data ingestion and trustworthy event-driven backtests that make optimization results credible enough to act on.
 
+## Current Milestone: v1.1 Quant Research Infrastructure
+
+**Goal:** Extend the existing MGC research platform with a professional research-integrity, analytics, and tearsheet layer so strategy results are trustworthy, explainable, and reusable.
+
+**Target features:**
+- Walk-forward testing inside `optimize`, plus proper train/validate/test handling
+- Monte Carlo testing, parameter stability analysis, and overfitting diagnostics
+- Automatic self-contained Plotly tearsheets after `backtest` and `optimize`
+- Full trade audit logging and richer analytics breakdowns
+- Reusable strategy infrastructure, indicator extraction, and strategy comparison
+
 ## Requirements
 
 ### Validated
@@ -27,22 +38,30 @@ Reliable MGC data ingestion and trustworthy event-driven backtests that make opt
 
 ### Active
 
-- [ ] Define v1.1 goals and requirements
+- [ ] Add a research-integrity layer with walk-forward testing, Monte Carlo validation, parameter stability analysis, and a protected train/validate/test workflow
+- [ ] Add a richer analytics and reporting layer with trade-audit detail, regime/session/calendar breakdowns, and drawdown recovery analysis
+- [ ] Generate interactive self-contained Plotly tearsheets automatically after `backtest` and `optimize`
+- [ ] Refactor the platform for future strategy reuse through generic strategy foundations, reusable indicators, config-driven switching, and strategy comparison
 
 ## Current State
 
 v1.0 is shipped. The repo now contains a complete local MGC research workflow with catalog ingestion, reusable backtesting, production strategy logic, optimization, and workflow hardening for repeated local use.
 
+v1.1 shifts from "can this strategy run?" to "can its results be trusted and compared professionally?" The existing core ingestion, backtest, strategy, optimization, and hardening layers remain the foundation; this milestone adds research validation, deep reporting, interactive visualization, and platform reuse without changing the current strategy's behavior.
+
 ## Next Milestone Goals
 
-- Define what should be tackled after the v1.0 baseline
-- Decide whether the next focus is execution realism, richer strategy logic, broader analytics, or workflow scale
-- Create a fresh requirements set instead of extending the archived v1.0 scope in place
+- Build statistically stronger validation around optimization results so overfitting is easier to detect
+- Produce professional tearsheets and analytics automatically after research runs
+- Generalize the platform so future strategies can plug into the same infrastructure with minimal boilerplate
 
 ### Out of Scope
 
-- Live trading and paper trading - v1 is backtesting and optimization only
-- Multi-instrument support - v1 is MGC futures only
+- Live trading and paper trading - reserve for a future major milestone
+- Multi-instrument support - still out of scope for v1.1
+- New data sources - this milestone builds on the existing local Databento workflow only
+- Changes to the existing MGC strategy logic - indicator extraction and base-class refactors must preserve behavior
+- Replacing the current core Nautilus backtest engine - extend the platform rather than rebuild it
 - Sub-minute or intrabar execution logic - v1 evaluates entries and exits on completed 1-minute bars only
 - Dashboards or web UI - CLI-first local workflow is sufficient for v1
 - Distributed optimization - local repeatable optimization is enough for v1
@@ -62,17 +81,21 @@ The user does not write code and wants the entire system implemented through Cod
 
 The local documentation folder `nt_docs/` is a required reference source before Nautilus-specific implementation decisions. Relevant planning and implementation should be grounded in `nt_docs/integrations/databento.md`, `nt_docs/how_to/data_catalog_databento.py`, `nt_docs/concepts/backtesting.md`, `nt_docs/getting_started/backtest_high_level.py`, `nt_docs/getting_started/backtest_low_level.py`, `nt_docs/concepts/strategies.md`, `nt_docs/api_reference/backtest.md`, and related persistence/adapter docs.
 
+This milestone is explicitly additive. The platform already has 47 passing tests, and nothing in v1.1 should regress those results. New components should continue the v1.0 project style: typed TOML config, clean module boundaries, and unit tests for every new component.
+
 ## Constraints
 
 - **Platform**: Windows 11 native with PowerShell - implementation and commands must work in the user's local environment
 - **Package Management**: Use `uv` and `uv pip install` only - aligns with the existing environment and user requirement
 - **Runtime**: Python 3.13.11 with `nautilus_trader 1.225.0` already installed - compatibility matters for all package and API choices
 - **Architecture**: Must follow Nautilus Trader's event-driven `Strategy` model - avoids invalid vectorized backtest design
+- **Platform Principle**: Always use Nautilus Trader native infrastructure first - custom code must extend native facilities instead of replacing them
 - **Data Source**: Use only the existing Databento files already available locally - v1 assumes no extra downloads or alternate vendors
 - **Execution Model**: Completed 1-minute bars only for signal evaluation - keeps v1 behavior deterministic and bounded
 - **Cost Model**: Include approximately `$0.50` commission per side and `1` tick (`$0.10`) slippage per fill from day one - realism matters for trustworthy results
 - **Interface**: Small CLI with `ingest`, `backtest`, and `optimize` commands - user wants clean explicit steps without rerunning unnecessary work
 - **Outputs**: Results must include summary statistics, ranked optimization output, and saved equity-curve PNGs - these define "done" for v1
+- **Backward Compatibility**: Existing strategy behavior and the current passing test suite must remain intact - v1.1 is an extension, not a rewrite
 
 ## Key Decisions
 
@@ -87,6 +110,11 @@ The local documentation folder `nt_docs/` is a required reference source before 
 | Keep Phase 4 optimization on the shared catalog-backed runner instead of forcing a low-level `BacktestEngine.reset()` rewrite | Nautilus supports `reset()` for in-memory repeated runs, but the full bars-plus-trades dataset is better matched to the high-level catalog-backed `BacktestNode` path | Phase 4 documents and preserves the high-level runner for optimization while keeping the decision explicit |
 | Add shared preflight validation and a `health` command instead of separate ad hoc setup checks | Local repeatability depends more on actionable readiness feedback than on extra features | Phase 5 centralizes command checks and exposes one readiness summary surface |
 | Retain a shared Nautilus log guard across repeated backtest runs | Repeated in-process `BacktestNode` runs can destabilize logging on this install if the guard is dropped between runs | Phase 5 keeps the runner stable for optimization reruns and holdout execution |
+| Treat v1.1 as a research-integrity and reporting expansion, not a strategy rewrite | The user wants professional confidence tooling around the existing platform, with no change to the current strategy logic | v1.1 focuses on validation, reporting, visualization, and platform reuse layers |
+| Prioritize research correctness over visualization polish and reusability if tradeoffs arise | A beautiful tearsheet is less valuable than statistically trustworthy results | v1.1 planning should favor correct walk-forward, Monte Carlo, and holdout workflows first |
+| Generate tearsheets automatically from the existing `backtest` and `optimize` commands | Reporting should be part of the normal workflow rather than a separate manual step | v1.1 should attach tearsheet generation to existing command paths |
+| Keep walk-forward analysis inside `optimize` via a flag instead of creating a separate command | The current CLI structure should stay focused and explicit | v1.1 should extend `optimize` rather than branching the workflow surface |
+| Extract indicators into a reusable library without changing current strategy behavior | Platform reuse matters, but preserving validated strategy logic matters more | Any indicator refactor in v1.1 must be behavior-preserving |
 
 ## Evolution
 
@@ -106,4 +134,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-09 after v1.0 milestone completion*
+*Last updated: 2026-04-08 after starting milestone v1.1*
