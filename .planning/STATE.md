@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: ready_to_plan
-stopped_at: Phase 2 complete
-last_updated: "2026-04-08T23:10:00.000Z"
-last_activity: 2026-04-08 - Phase 2 complete, Phase 3 ready to plan
+stopped_at: Phase 3 context gathered
+last_updated: "2026-04-08T23:45:00.000Z"
+last_activity: 2026-04-08 - Phase 3 context gathered, ready for planning
 progress:
   total_phases: 5
   completed_phases: 2
@@ -28,7 +28,7 @@ See: .planning/PROJECT.md (updated 2026-04-08)
 Phase: 3 of 5 (Strategy Logic)
 Plan: 0 of 4 in current phase
 Status: Ready to plan
-Last activity: 2026-04-08 - Phase 2 complete, Phase 3 ready to plan
+Last activity: 2026-04-08 - Phase 3 context gathered, ready for planning
 
 Progress: [####------] 40%
 
@@ -66,6 +66,8 @@ Recent decisions affecting current work:
 - Phase 1: Treat degraded Databento days as warnings, not structural failures
 - Phase 2: Use `BacktestRunConfig` as the verified top-level high-level config on installed `nautilus_trader 1.225.0`
 - Phase 2: Use a venue latency model to achieve next-bar execution natively on 1-minute bars
+- Phase 3: Production strategy logic must stay event-driven, stateful, and built from pure-Python rolling indicators
+- Phase 3: Preserve the catalog decode split whenever catalog-backed assumptions matter: definitions legacy Cython, bars/trades `as_legacy_cython=False`
 
 ### Pending Todos
 
@@ -74,10 +76,10 @@ None yet.
 ### Blockers/Concerns
 
 - Nautilus-specific implementation should continue to reference `nt_docs/` for adapter/backtest details
-- Phase 3 should replace the temporary Phase 2 harness strategy with the real MGC production logic
+- Phase 3 planning should translate the locked strategy rules into indicator modules, state-machine logic, and tests without broadening scope
 
 ## Session Continuity
 
 Last session: 2026-04-08 08:55
-Stopped at: Phase 2 complete
-Resume file: .planning/phases/02-backtest-runner/02-VERIFICATION.md
+Stopped at: Phase 3 context gathered
+Resume file: .planning/phases/03-strategy-logic/03-CONTEXT.md
