@@ -91,11 +91,13 @@ For Plotly, the right approach is:
 - embed figures directly into the HTML using local Plotly JS payloads
 - avoid external CDN references
 - keep the page as one scrollable document with light inline JS for section toggles and trace/show-hide controls
+- use `plotly.io.to_html()` with `include_plotlyjs=True` exactly once, then `include_plotlyjs=False` for later charts in the same document
 
 Implication:
 - A pure Python HTML generator is sufficient.
 - No frontend build tooling or JS framework is needed.
 - The page can stay deterministic and testable as an artifact generator, not an application.
+- The renderer should centralize Plotly embed assembly so the JS bundle is written once and the total HTML stays within the user's under-10MB target.
 
 ### 5. Missing-section notices should be data-loader driven
 

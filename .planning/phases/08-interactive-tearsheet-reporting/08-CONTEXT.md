@@ -84,6 +84,8 @@ Phase 8 adds automatic self-contained HTML tearsheets to the existing `backtest`
 - **D-40:** File size should stay reasonable, so the tearsheet must not embed raw `audit_log.csv` contents directly.
 - **D-41:** Large artifacts such as the audit log must be summarized into visual/statistical outputs rather than inlined wholesale.
 - **D-42:** The tearsheet file must be added to `manifest.json` automatically.
+- **D-43:** For self-contained Plotly output, use `plotly.io.to_html()` with `include_plotlyjs=True` for the first chart embedded in the document and `include_plotlyjs=False` for all subsequent charts so the Plotly bundle is embedded exactly once.
+- **D-44:** `tearsheet.html` should target a total size under `10 MB`, including optimization runs with many charts.
 
 ### the agent's Discretion
 - Exact HTML/CSS component composition for the stat-card grid, section chrome, and footer formatting
