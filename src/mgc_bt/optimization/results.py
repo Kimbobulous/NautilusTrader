@@ -285,6 +285,51 @@ def write_walk_forward_artifacts(
     return outputs
 
 
+def write_monte_carlo_artifacts(run_dir: Path, analysis: dict[str, Any]) -> dict[str, Path]:
+    monte_carlo_root = run_dir / "monte_carlo"
+    monte_carlo_root.mkdir(parents=True, exist_ok=True)
+
+    permutation_path = monte_carlo_root / "permutation_summary.json"
+    permutation_path.write_text(json.dumps(analysis["permutation"], indent=2), encoding="utf-8")
+
+    bootstrap_path = monte_carlo_root / "bootstrap_summary.json"
+    bootstrap_path.write_text(json.dumps(analysis["bootstrap"], indent=2), encoding="utf-8")
+
+    confidence_path = monte_carlo_root / "equity_confidence_bands.csv"
+    confidence_rows = analysis.get("confidence_bands", [])
+    fieldnames = list(confidence_rows[0].keys()) if confidence_rows else ["trade_index"]
+    with confidence_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in confidence_rows:
+            writer.writerow(row)
+
+    summary_path = monte_carlo_root / "monte_carlo_summary.json"
+    summary_payload = {
+        "schema_version": 1,
+        "run_type": "optimize",
+        "analysis_type": "monte_carlo",
+        "method": "combined",
+        "simulations": analysis.get("simulations"),
+        "sample_size": analysis.get("sample_size"),
+        "p_value": analysis.get("permutation", {}).get("p_value"),
+        "percentiles": analysis.get("percentiles"),
+        "pass_95": analysis.get("permutation", {}).get("pass_95"),
+        "status": analysis.get("status"),
+    }
+    if analysis.get("skipped_reason") is not None:
+        summary_payload["skipped_reason"] = analysis["skipped_reason"]
+    summary_path.write_text(json.dumps(summary_payload, indent=2), encoding="utf-8")
+
+    return {
+        "root": monte_carlo_root,
+        "permutation_path": permutation_path,
+        "bootstrap_path": bootstrap_path,
+        "confidence_path": confidence_path,
+        "summary_path": summary_path,
+    }
+
+
 def _float_or_none(value: Any) -> float | None:
     if value is None:
         return None

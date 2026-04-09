@@ -14,11 +14,13 @@ from mgc_bt.optimization.export import export_best_run
 from mgc_bt.optimization.export import export_top_10
 from mgc_bt.optimization.export import rerun_best_in_sample
 from mgc_bt.optimization.export import rerun_holdout
+from mgc_bt.optimization.monte_carlo import run_monte_carlo_analysis
 from mgc_bt.optimization.objective import TrialEvaluator
 from mgc_bt.optimization.results import create_optimization_run_dir
 from mgc_bt.optimization.results import failed_trial_rows
 from mgc_bt.optimization.results import ranked_trial_rows
 from mgc_bt.optimization.results import refresh_latest_results
+from mgc_bt.optimization.results import write_monte_carlo_artifacts
 from mgc_bt.optimization.results import write_walk_forward_artifacts
 from mgc_bt.optimization.results import write_optimization_manifest
 from mgc_bt.optimization.results import write_failed_trials_json
@@ -158,6 +160,14 @@ def run_optimization(
             "best_value": None,
             "overfit_warning": False,
             "analysis_flags": analysis_flags,
+            "monte_carlo_status": _analysis_status(
+                enabled=analysis_flags["monte_carlo_enabled"],
+                skipped_by_flag=skip_monte_carlo,
+            ),
+            "stability_status": _analysis_status(
+                enabled=analysis_flags["stability_enabled"],
+                skipped_by_flag=skip_stability,
+            ),
         }
 
     best_trial = study.best_trial
@@ -223,6 +233,25 @@ def run_optimization(
         analysis_flags=analysis_flags,
         final_test_window=final_test_window,
     )
+    monte_carlo_paths = None
+    monte_carlo_status = _analysis_status(
+        enabled=analysis_flags["monte_carlo_enabled"],
+        skipped_by_flag=skip_monte_carlo,
+    )
+    if analysis_flags["monte_carlo_enabled"]:
+        trade_log = _select_trade_log_for_monte_carlo(
+            walk_forward_trade_log=None,
+            holdout_result=holdout_result,
+            in_sample_result=in_sample_result,
+        )
+        monte_carlo_result = run_monte_carlo_analysis(
+            trade_log,
+            simulations=settings.monte_carlo.simulations,
+            seed=settings.optimization.seed + settings.monte_carlo.random_seed_offset,
+            percentiles=settings.monte_carlo.percentile_points,
+            confidence_level=settings.monte_carlo.confidence_level,
+        )
+        monte_carlo_paths = write_monte_carlo_artifacts(run_dir, monte_carlo_result)
     write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
     latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
     return {
@@ -246,6 +275,12 @@ def run_optimization(
         "in_sample_result": in_sample_result,
         "holdout_result": holdout_result,
         "analysis_flags": analysis_flags,
+        "monte_carlo_summary_path": monte_carlo_paths["summary_path"] if monte_carlo_paths else None,
+        "monte_carlo_status": monte_carlo_status,
+        "stability_status": _analysis_status(
+            enabled=analysis_flags["stability_enabled"],
+            skipped_by_flag=skip_stability,
+        ),
     }
 
 
@@ -313,6 +348,20 @@ def _run_walk_forward_branch(
         },
         "overfit_warning": False,
     }
+    monte_carlo_paths = None
+    monte_carlo_status = _analysis_status(
+        enabled=analysis_flags["monte_carlo_enabled"],
+        skipped_by_flag=False,
+    )
+    if analysis_flags["monte_carlo_enabled"]:
+        monte_carlo_result = run_monte_carlo_analysis(
+            aggregate.aggregated_trade_log,
+            simulations=settings.monte_carlo.simulations,
+            seed=settings.optimization.seed + settings.monte_carlo.random_seed_offset,
+            percentiles=settings.monte_carlo.percentile_points,
+            confidence_level=settings.monte_carlo.confidence_level,
+        )
+        monte_carlo_paths = write_monte_carlo_artifacts(run_dir, monte_carlo_result)
     _attach_phase_six_metadata(summary, analysis_flags, final_test_window)
     summary_path = write_optimization_summary_json(run_dir, summary)
     run_config_path = write_optimization_run_config(
@@ -342,6 +391,12 @@ def _run_walk_forward_branch(
         "holdout_plot_path": artifact_paths.get("final_test_plot_path"),
         "overfit_warning": False,
         "analysis_flags": analysis_flags,
+        "monte_carlo_summary_path": monte_carlo_paths["summary_path"] if monte_carlo_paths else None,
+        "monte_carlo_status": monte_carlo_status,
+        "stability_status": _analysis_status(
+            enabled=analysis_flags["stability_enabled"],
+            skipped_by_flag=False,
+        ),
     }
 
 
@@ -515,3 +570,26 @@ def _window_result_row(result: Any) -> dict[str, Any]:
         "test_bar_count": result.test_bar_count,
         "selected_params": result.selected_params,
     }
+
+
+def _analysis_status(*, enabled: bool, skipped_by_flag: bool) -> str:
+    if skipped_by_flag:
+        return "skipped_by_flag"
+    if enabled:
+        return "completed"
+    return "not_requested"
+
+
+def _select_trade_log_for_monte_carlo(
+    *,
+    walk_forward_trade_log: list[dict[str, Any]] | None,
+    holdout_result: dict[str, Any] | None,
+    in_sample_result: dict[str, Any] | None,
+) -> list[dict[str, Any]]:
+    if walk_forward_trade_log:
+        return walk_forward_trade_log
+    if holdout_result is not None and holdout_result.get("trade_log"):
+        return list(holdout_result["trade_log"])
+    if in_sample_result is not None and in_sample_result.get("trade_log"):
+        return list(in_sample_result["trade_log"])
+    return []

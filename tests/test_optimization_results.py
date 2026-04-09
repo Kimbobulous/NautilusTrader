@@ -348,6 +348,11 @@ def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -
                     {"window_index": 2, "supertrend_factor": 2.0},
                 ],
                 status="completed",
+                aggregated_trade_log=[
+                    {"realized_pnl": 100.0},
+                    {"realized_pnl": -25.0},
+                    {"realized_pnl": 60.0},
+                ],
             ),
         },
     )
@@ -359,6 +364,10 @@ def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -
     assert (walk_root / "aggregated_summary.json").exists()
     assert (walk_root / "equity_curve.png").exists()
     assert (walk_root / "params_over_time.csv").exists()
+    assert (result["run_dir"] / "monte_carlo" / "permutation_summary.json").exists()
+    assert (result["run_dir"] / "monte_carlo" / "bootstrap_summary.json").exists()
+    assert (result["run_dir"] / "monte_carlo" / "equity_confidence_bands.csv").exists()
+    assert (result["run_dir"] / "monte_carlo" / "monte_carlo_summary.json").exists()
 
     summary_payload = json.loads((walk_root / "aggregated_summary.json").read_text(encoding="utf-8"))
     assert summary_payload["schema_version"] == 1
@@ -366,6 +375,11 @@ def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -
     assert summary_payload["status"] == "completed"
     assert summary_payload["completed_window_count"] == 1
     assert summary_payload["inconclusive_window_count"] == 1
+    monte_carlo_payload = json.loads(
+        ((result["run_dir"] / "monte_carlo" / "monte_carlo_summary.json").read_text(encoding="utf-8")),
+    )
+    assert monte_carlo_payload["schema_version"] == 1
+    assert monte_carlo_payload["analysis_type"] == "monte_carlo"
 
 
 def _temp_settings(tmp_path: Path):

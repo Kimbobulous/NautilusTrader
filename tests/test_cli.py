@@ -196,6 +196,48 @@ def test_cli_optimize_reports_walk_forward_summary(monkeypatch, capsys) -> None:
     assert "Walk-forward windows: completed=4, skipped=1, inconclusive=2" in stdout
 
 
+def test_cli_optimize_reports_monte_carlo_states(monkeypatch, capsys) -> None:
+    responses = [
+        {
+            "study_name": "a",
+            "seed": 42,
+            "completed_trials": 1,
+            "failed_trials": 0,
+            "best_value": 1.0,
+            "best_params": {},
+            "run_dir": "results/optimization/a",
+            "latest_dir": None,
+            "storage_path": "results/optimization/optuna_storage.db",
+            "monte_carlo_status": "not_requested",
+        },
+        {
+            "study_name": "b",
+            "seed": 42,
+            "completed_trials": 1,
+            "failed_trials": 0,
+            "best_value": 1.0,
+            "best_params": {},
+            "run_dir": "results/optimization/b",
+            "latest_dir": None,
+            "storage_path": "results/optimization/optuna_storage.db",
+            "monte_carlo_status": "skipped_by_flag",
+        },
+    ]
+
+    def fake_run_optimization(settings, **kwargs):
+        return responses.pop(0)
+
+    monkeypatch.setattr("mgc_bt.optimization.study.run_optimization", fake_run_optimization)
+
+    main(["optimize"])
+    stdout_default = capsys.readouterr().out
+    main(["optimize", "--walk-forward", "--skip-monte-carlo"])
+    stdout_skipped = capsys.readouterr().out
+
+    assert "Monte Carlo: not requested" in stdout_default
+    assert "Monte Carlo: skipped by flag" in stdout_skipped
+
+
 def test_cli_backtest_reports_missing_catalog_with_actionable_error(tmp_path: Path) -> None:
     config_path = _write_settings_file(
         tmp_path / "settings.toml",

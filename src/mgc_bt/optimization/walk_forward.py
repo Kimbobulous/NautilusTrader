@@ -1,11 +1,9 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from dataclasses import dataclass
+from dataclasses import field
 from datetime import UTC
 from datetime import datetime
-from pathlib import Path
-import time
 from typing import Any, TextIO
 
 import optuna
@@ -66,6 +64,7 @@ class WalkForwardAggregateSummary:
     aggregated_equity_curve: list[dict[str, Any]]
     selected_params: list[dict[str, Any]]
     status: str
+    aggregated_trade_log: list[dict[str, Any]] = field(default_factory=list)
 
 
 def build_walk_forward_windows(settings: Settings) -> list[WalkForwardWindow]:
@@ -348,6 +347,11 @@ def _aggregate_walk_forward(window_results: list[WalkForwardWindowResult]) -> Wa
         aggregated_equity_curve=equity_curve,
         selected_params=selected_params,
         status=status,
+        aggregated_trade_log=[
+            trade
+            for result in conclusive
+            for trade in (result.test_result or {}).get("trade_log", [])
+        ],
     )
 
 

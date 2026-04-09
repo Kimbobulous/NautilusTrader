@@ -202,6 +202,18 @@ def _render_optimization_summary(result: dict[str, object]) -> str:
             "Walk-forward windows: "
             f"completed={counts['completed']}, skipped={counts['skipped']}, inconclusive={counts['inconclusive']}",
         )
+    if result.get("monte_carlo_summary_path") is not None:
+        lines.append(f"Monte Carlo summary: {result['monte_carlo_summary_path']}")
+    elif result.get("monte_carlo_status") == "skipped_by_flag":
+        lines.append("Monte Carlo: skipped by flag")
+    elif result.get("monte_carlo_status") == "not_requested":
+        lines.append("Monte Carlo: not requested")
+    if result.get("stability_summary_path") is not None:
+        lines.append(f"Stability summary: {result['stability_summary_path']}")
+    elif result.get("stability_status") == "skipped_by_flag":
+        lines.append("Stability: skipped by flag")
+    elif result.get("stability_status") == "not_requested":
+        lines.append("Stability: not requested")
     return "\n".join(lines)
 
 
