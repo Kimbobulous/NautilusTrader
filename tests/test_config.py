@@ -1,6 +1,20 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+import pytest
+
+from mgc_bt.config import ConfigError
+from mgc_bt.config import load_settings
+
+
+def test_optimization_settings_validate_ordering(tmp_path: Path) -> None:
+    config_path = tmp_path / "settings.toml"
+    config_path.write_text(
+        """
 [paths]
 project_root = "."
-data_root = "C:/dev/mgc-data"
+data_root = "data"
 catalog_root = "catalog"
 results_root = "results"
 
@@ -33,7 +47,7 @@ roll_preference = "open_interest"
 calendar_roll_business_days = 5
 start_date = ""
 end_date = ""
-commission_per_side = 0.50
+commission_per_side = 0.5
 slippage_ticks = 1
 supertrend_atr_length = 10
 supertrend_factor = 3.0
@@ -61,16 +75,21 @@ max_consecutive_losses = 4
 max_drawdown_pct = 5.0
 
 [optimization]
-study_name = "mgc-optuna"
+study_name = "bad-order"
 direction = "maximize"
 results_subdir = "optimization"
 storage_filename = "optuna_storage.db"
 seed = 42
-max_trials = 200
-max_runtime_seconds = 14400
-early_stop_window = 50
+max_trials = 5
+max_runtime_seconds = 60
+early_stop_window = 5
 early_stop_min_improvement = 0.05
-in_sample_start = "2021-03-08T00:00:00+00:00"
-in_sample_end = "2025-03-08T00:00:00+00:00"
-holdout_start = "2025-03-08T00:00:00+00:00"
-holdout_end = "2026-03-08T00:00:00+00:00"
+in_sample_start = "2025-01-01T00:00:00+00:00"
+in_sample_end = "2026-01-01T00:00:00+00:00"
+holdout_start = "2025-06-01T00:00:00+00:00"
+holdout_end = "2026-06-01T00:00:00+00:00"
+""",
+        encoding="utf-8",
+    )
+    with pytest.raises(ConfigError):
+        load_settings(config_path)

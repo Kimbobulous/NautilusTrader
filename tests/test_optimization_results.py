@@ -1,0 +1,148 @@
+from __future__ import annotations
+
+from dataclasses import replace
+from pathlib import Path
+
+import optuna
+
+from mgc_bt.config import OptimizationConfig
+from mgc_bt.config import PathsConfig
+from mgc_bt.config import load_settings
+from mgc_bt.optimization.results import ranked_trial_rows
+from mgc_bt.optimization.study import run_optimization
+
+
+def test_ranked_trial_rows_use_locked_tie_break_order() -> None:
+    study = optuna.create_study(direction="maximize")
+
+    def objective(trial):
+        if trial.number == 0:
+            trial.set_user_attr("sharpe_ratio", 1.0)
+            trial.set_user_attr("total_pnl", 100.0)
+            trial.set_user_attr("win_rate", 50.0)
+            trial.set_user_attr("max_drawdown_pct", 12.0)
+            trial.set_user_attr("total_trades", 40)
+            return 1.5
+        trial.set_user_attr("sharpe_ratio", 1.0)
+        trial.set_user_attr("total_pnl", 110.0)
+        trial.set_user_attr("win_rate", 51.0)
+        trial.set_user_attr("max_drawdown_pct", 8.0)
+        trial.set_user_attr("total_trades", 45)
+        return 1.5
+
+    study.optimize(objective, n_trials=2)
+    rows = ranked_trial_rows(study)
+    assert rows[0]["trial_number"] == 1
+    assert rows[0]["rank"] == 1
+    assert rows[1]["trial_number"] == 0
+
+
+def test_run_optimization_writes_ranked_results_and_holdout_exports(tmp_path, monkeypatch) -> None:
+    settings = _temp_settings(tmp_path)
+
+    def fake_sample_trial_params(trial):
+        base = trial.number + 1
+        return {
+            "supertrend_atr_length": trial.suggest_int("supertrend_atr_length", 5 + trial.number, 5 + trial.number),
+            "supertrend_factor": trial.suggest_float("supertrend_factor", 1.5 + trial.number, 1.5 + trial.number),
+            "supertrend_training_period": trial.suggest_int("supertrend_training_period", 50, 50),
+            "vwap_reset_hour_utc": trial.suggest_int("vwap_reset_hour_utc", 0, 0),
+            "wavetrend_n1": trial.suggest_int("wavetrend_n1", 10, 10),
+            "wavetrend_n2": trial.suggest_int("wavetrend_n2", 21, 21),
+            "wavetrend_ob_level": trial.suggest_float("wavetrend_ob_level", 2.0, 2.0),
+            "delta_imbalance_threshold": trial.suggest_float("delta_imbalance_threshold", 0.3, 0.3),
+            "absorption_volume_multiplier": trial.suggest_float("absorption_volume_multiplier", 1.2, 1.2),
+            "absorption_range_multiplier": trial.suggest_float("absorption_range_multiplier", 0.5, 0.5),
+            "volume_lookback": trial.suggest_int("volume_lookback", 20, 20),
+            "atr_trail_length": trial.suggest_int("atr_trail_length", 14, 14),
+            "atr_trail_multiplier": trial.suggest_float("atr_trail_multiplier", 2.0, 2.0),
+            "min_pullback_bars": trial.suggest_int("min_pullback_bars", 2 + trial.number, 2 + trial.number),
+            "max_loss_per_trade_dollars": trial.suggest_float("max_loss_per_trade_dollars", 100.0 + base, 100.0 + base),
+            "max_daily_loss_dollars": trial.suggest_float("max_daily_loss_dollars", 300.0 + base, 300.0 + base),
+            "max_consecutive_losses": trial.suggest_int("max_consecutive_losses", 3, 3),
+            "max_drawdown_pct": trial.suggest_float("max_drawdown_pct", 5.0, 5.0),
+        }
+
+    def fake_run_backtest(settings, params):
+        start_date = params["start_date"]
+        factor = float(params["supertrend_factor"])
+        holdout = start_date == settings.optimization.holdout_start
+        sharpe = factor - (0.4 if holdout else 0.0)
+        return {
+            "mode": "auto_roll",
+            "instrument_id": "AUTO_ROLL:MGC",
+            "segment_instruments": ["MGCJ1.GLBX"],
+            "segment_count": 1,
+            "start_date": params["start_date"],
+            "end_date": params["end_date"],
+            "total_pnl": factor * 1000.0,
+            "sharpe_ratio": sharpe,
+            "win_rate": 55.0,
+            "max_drawdown": 250.0,
+            "max_drawdown_pct": 10.0,
+            "total_trades": 50,
+            "parameters": params,
+            "segments": [],
+            "trade_log": [
+                {
+                    "instrument_id": "MGCJ1.GLBX",
+                    "entry_side": "BUY",
+                    "quantity": 1.0,
+                    "opened_at": params["start_date"],
+                    "closed_at": params["end_date"],
+                    "avg_px_open": 100.0,
+                    "avg_px_close": 101.0,
+                    "realized_pnl": 10.0,
+                    "realized_return": 0.01,
+                    "commissions": 1.0,
+                    "position_id": "1",
+                    "slippage": 0.1,
+                },
+            ],
+            "equity_curve": [
+                {"timestamp": params["start_date"], "equity": 50000.0},
+                {"timestamp": params["end_date"], "equity": 50500.0},
+            ],
+        }
+
+    monkeypatch.setattr("mgc_bt.optimization.objective.sample_trial_params", fake_sample_trial_params)
+    monkeypatch.setattr("mgc_bt.optimization.objective.run_backtest", fake_run_backtest)
+    monkeypatch.setattr("mgc_bt.optimization.export.run_backtest", fake_run_backtest)
+
+    result = run_optimization(settings, study_name="opt-test", max_trials=3)
+    assert result["completed_trials"] == 3
+    assert result["failed_trials"] == 0
+    assert result["overfit_warning"] is True
+
+    run_dir = result["run_dir"]
+    assert (run_dir / "ranked_results.csv").exists()
+    assert (run_dir / "optimization_summary.json").exists()
+    assert (run_dir / "run_config.toml").exists()
+    assert (run_dir / "failed_trials.json").exists()
+    assert (run_dir / "best_run" / "summary.json").exists()
+    assert (run_dir / "best_run" / "trades.csv").exists()
+    assert (run_dir / "best_run" / "equity_curve.png").exists()
+    assert (run_dir / "best_run" / "holdout_results.json").exists()
+    assert (run_dir / "best_run" / "holdout_equity_curve.png").exists()
+    assert (run_dir.parent / "latest" / "ranked_results.csv").exists()
+
+
+def _temp_settings(tmp_path: Path):
+    settings = load_settings("configs/settings.toml")
+    return replace(
+        settings,
+        paths=replace(
+            settings.paths,
+            project_root=tmp_path,
+            catalog_root=tmp_path / "catalog",
+            results_root=tmp_path / "results",
+        ),
+        optimization=replace(
+            settings.optimization,
+            study_name="opt-test",
+            max_trials=3,
+            max_runtime_seconds=60,
+            early_stop_window=50,
+            results_subdir="optimization",
+        ),
+    )

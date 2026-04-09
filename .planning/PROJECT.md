@@ -20,10 +20,12 @@ Reliable MGC data ingestion and trustworthy event-driven backtests that make opt
   Validated in Phase 1: Catalog Foundation
 - [x] Run a catalog-backed Nautilus backtest through a reusable Python runner and CLI, with saved metrics/trade/artifact outputs
   Validated in Phase 2: Backtest Runner
+- [x] Optimize strategy and approved custom risk parameters with Optuna and persist ranked in-sample plus holdout-evaluation results
+  Validated in Phase 4: Optimization Workflow
 
 ### Active
 
-- [ ] Optimize strategy parameters with Optuna and produce ranked results plus an equity curve for the best run
+- [ ] Add validation and hardening safeguards for repeated local research use
 
 ### Out of Scope
 
@@ -70,6 +72,7 @@ The local documentation folder `nt_docs/` is a required reference source before 
 | Use Nautilus Trader's event-driven `Strategy` architecture | Matches the engine's actual design and avoids invalid vectorized implementations | Phase 1 kept the foundation catalog-first and ready for Nautilus-native backtesting |
 | Include commissions and slippage from v1 | Backtest trust matters more than optimistic raw signal results | Phase 2 implements commission, one-tick slippage, and next-bar timing through Nautilus-native venue/fill/latency configuration |
 | Keep v1 to MGC futures, rule-based logic, and local Databento files only | Prevents scope creep while establishing a credible research baseline | Phase 1 filters the catalog to outright MGC futures contracts and local Databento files only |
+| Keep Phase 4 optimization on the shared catalog-backed runner instead of forcing a low-level `BacktestEngine.reset()` rewrite | Nautilus supports `reset()` for in-memory repeated runs, but the full bars-plus-trades dataset is better matched to the high-level catalog-backed `BacktestNode` path | Phase 4 documents and preserves the high-level runner for optimization while keeping the decision explicit |
 
 ## Evolution
 
@@ -89,4 +92,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-08 after Phase 2 execution*
+*Last updated: 2026-04-09 after Phase 4 execution*

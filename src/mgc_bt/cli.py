@@ -29,7 +29,10 @@ def build_parser() -> argparse.ArgumentParser:
     backtest_parser.add_argument("--instrument-id", help="Run a single-contract backtest for this specific instrument.")
     backtest_parser.add_argument("--start-date", help="Override the configured UTC start date for the run.")
     backtest_parser.add_argument("--end-date", help="Override the configured UTC end date for the run.")
-    subparsers.add_parser("optimize", help="Run Optuna parameter optimization.")
+    optimize_parser = subparsers.add_parser("optimize", help="Run Optuna parameter optimization.")
+    optimize_parser.add_argument("--resume", action="store_true", help="Resume an existing named Optuna study.")
+    optimize_parser.add_argument("--study-name", help="Override the configured Optuna study name.")
+    optimize_parser.add_argument("--max-trials", type=int, help="Override the configured maximum trial count.")
     return parser
 
 
@@ -61,6 +64,17 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             artifact_paths = write_backtest_artifacts(settings, result)
             print(_render_backtest_summary(result, artifact_paths))
+            return 0
+        if args.command == "optimize":
+            from mgc_bt.optimization.study import run_optimization
+
+            result = run_optimization(
+                settings,
+                resume=bool(getattr(args, "resume", False)),
+                study_name=getattr(args, "study_name", None),
+                max_trials=getattr(args, "max_trials", None),
+            )
+            print(_render_optimization_summary(result))
             return 0
 
         raise CLIError(f"The '{args.command}' command is not implemented yet.")
@@ -95,4 +109,25 @@ def _render_backtest_summary(result: dict[str, object], artifact_paths: dict[str
     if artifact_paths is not None:
         lines.append(f"Run directory: {artifact_paths['run_dir']}")
         lines.append(f"Latest directory: {artifact_paths['latest_dir']}")
+    return "\n".join(lines)
+
+
+def _render_optimization_summary(result: dict[str, object]) -> str:
+    lines = [
+        f"Study: {result['study_name']}",
+        f"Seed: {result['seed']}",
+        f"Completed trials: {result['completed_trials']}",
+        f"Failed trials: {result['failed_trials']}",
+        f"Best objective: {result['best_value']}",
+        f"Best params: {result['best_params']}",
+        f"Run directory: {result['run_dir']}",
+        f"Latest directory: {result['latest_dir']}",
+        f"Storage path: {result['storage_path']}",
+    ]
+    if result.get("best_run_dir") is not None:
+        lines.append(f"Best run directory: {result['best_run_dir']}")
+    if result.get("holdout_summary_path") is not None:
+        lines.append(f"Holdout results: {result['holdout_summary_path']}")
+    if result.get("overfit_warning"):
+        lines.append("Warning: holdout Sharpe is more than 0.3 below in-sample Sharpe.")
     return "\n".join(lines)

@@ -83,6 +83,17 @@ class RiskConfig:
 class OptimizationConfig:
     study_name: str
     direction: str
+    results_subdir: str
+    storage_filename: str
+    seed: int
+    max_trials: int
+    max_runtime_seconds: int
+    early_stop_window: int
+    early_stop_min_improvement: float
+    in_sample_start: str
+    in_sample_end: str
+    holdout_start: str
+    holdout_end: str
 
 
 @dataclass(frozen=True)
@@ -119,7 +130,7 @@ def load_settings(config_path: str | Path) -> Settings:
     risk = raw["risk"]
     optimization = raw["optimization"]
 
-    return Settings(
+    settings = Settings(
         config_path=path,
         paths=PathsConfig(
             project_root=project_root,
@@ -188,8 +199,21 @@ def load_settings(config_path: str | Path) -> Settings:
         optimization=OptimizationConfig(
             study_name=str(_require(optimization, "study_name", "optimization")),
             direction=str(_require(optimization, "direction", "optimization")),
+            results_subdir=str(optimization.get("results_subdir", "optimization")),
+            storage_filename=str(optimization.get("storage_filename", "optuna_storage.db")),
+            seed=int(optimization.get("seed", 42)),
+            max_trials=int(optimization.get("max_trials", 200)),
+            max_runtime_seconds=int(optimization.get("max_runtime_seconds", 14_400)),
+            early_stop_window=int(optimization.get("early_stop_window", 50)),
+            early_stop_min_improvement=float(optimization.get("early_stop_min_improvement", 0.05)),
+            in_sample_start=str(optimization.get("in_sample_start", "2021-03-08T00:00:00+00:00")),
+            in_sample_end=str(optimization.get("in_sample_end", "2025-03-08T00:00:00+00:00")),
+            holdout_start=str(optimization.get("holdout_start", "2025-03-08T00:00:00+00:00")),
+            holdout_end=str(optimization.get("holdout_end", "2026-03-08T00:00:00+00:00")),
         ),
     )
+    _validate_optimization_settings(settings)
+    return settings
 
 
 def _resolve_path(value: str | Path, project_root: Path, relative_to: Path) -> Path:
@@ -218,3 +242,35 @@ def _optional_str(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _validate_optimization_settings(settings: Settings) -> None:
+    if settings.optimization.seed < 0:
+        raise ConfigError("Optimization seed must be non-negative.")
+    if settings.optimization.max_trials <= 0:
+        raise ConfigError("Optimization max_trials must be greater than zero.")
+    if settings.optimization.max_runtime_seconds <= 0:
+        raise ConfigError("Optimization max_runtime_seconds must be greater than zero.")
+    if settings.optimization.early_stop_window <= 0:
+        raise ConfigError("Optimization early_stop_window must be greater than zero.")
+    if settings.optimization.early_stop_min_improvement < 0:
+        raise ConfigError("Optimization early_stop_min_improvement cannot be negative.")
+
+    in_sample_start = _coerce_timestamp(settings.optimization.in_sample_start)
+    in_sample_end = _coerce_timestamp(settings.optimization.in_sample_end)
+    holdout_start = _coerce_timestamp(settings.optimization.holdout_start)
+    holdout_end = _coerce_timestamp(settings.optimization.holdout_end)
+    if in_sample_start >= in_sample_end:
+        raise ConfigError("Optimization in-sample start must be earlier than in-sample end.")
+    if holdout_start >= holdout_end:
+        raise ConfigError("Optimization holdout start must be earlier than holdout end.")
+    if in_sample_end > holdout_start:
+        raise ConfigError("Optimization in-sample end must be earlier than or equal to holdout start.")
+
+
+def _coerce_timestamp(value: str):
+    try:
+        from pandas import Timestamp
+    except Exception as exc:  # pragma: no cover - pandas is a required dependency transitively
+        raise ConfigError(f"Could not validate optimization timestamps: {exc}") from exc
+    return Timestamp(value, tz="UTC")

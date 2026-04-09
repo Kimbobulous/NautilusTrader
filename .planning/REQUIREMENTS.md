@@ -40,11 +40,11 @@
 
 ### Optimization
 
-- [ ] **OPT-01**: User can run parameter optimization with Optuna against the Nautilus backtest workflow
-- [ ] **OPT-02**: Each tested parameter combination records Sharpe ratio, total PnL, win rate, max drawdown, and total trades
-- [ ] **OPT-03**: User receives a ranked parameter table for all tested combinations in the optimization run
-- [ ] **OPT-04**: User receives an equity curve PNG for the best parameter set from optimization
-- [ ] **OPT-05**: Optimization outputs are saved into a results directory for later review
+- [x] **OPT-01**: User can run parameter optimization with Optuna against the Nautilus backtest workflow
+- [x] **OPT-02**: Each tested parameter combination records Sharpe ratio, total PnL, win rate, max drawdown, and total trades
+- [x] **OPT-03**: User receives a ranked parameter table for all tested combinations in the optimization run
+- [x] **OPT-04**: User receives an equity curve PNG for the best parameter set from optimization
+- [x] **OPT-05**: Optimization outputs are saved into a results directory for later review
 
 ## v2 Requirements
 
@@ -98,11 +98,11 @@
 | STRAT-03 | Phase 3 | Completed |
 | STRAT-04 | Phase 3 | Completed |
 | STRAT-05 | Phase 3 | Completed |
-| OPT-01 | Phase 4 | Pending |
-| OPT-02 | Phase 4 | Pending |
-| OPT-03 | Phase 4 | Pending |
-| OPT-04 | Phase 4 | Pending |
-| OPT-05 | Phase 4 | Pending |
+| OPT-01 | Phase 4 | Completed |
+| OPT-02 | Phase 4 | Completed |
+| OPT-03 | Phase 4 | Completed |
+| OPT-04 | Phase 4 | Completed |
+| OPT-05 | Phase 4 | Completed |
 
 **Coverage:**
 - v1 requirements: 26 total
@@ -111,4 +111,4 @@
 
 ---
 *Requirements defined: 2026-04-08*
-*Last updated: 2026-04-09 after Phase 3 completion*
+*Last updated: 2026-04-09 after Phase 4 completion*

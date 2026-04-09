@@ -13,7 +13,7 @@ This roadmap builds the system in dependency order: first establish a clean loca
 - [x] **Phase 1: Catalog Foundation** - Build the project skeleton, config system, CLI shell, and validated Databento catalog ingestion (completed 2026-04-08)
 - [x] **Phase 2: Backtest Runner** - Wire Nautilus backtest execution, venue assumptions, and reporting outputs (completed 2026-04-08)
 - [x] **Phase 3: Strategy Logic** - Implement the MGC trend-following pullback strategy inside Nautilus event handlers (completed 2026-04-09)
-- [ ] **Phase 4: Optimization Workflow** - Add Optuna parameter search with ranked outputs and best-run artifacts
+- [x] **Phase 4: Optimization Workflow** - Add Optuna parameter search with ranked outputs and best-run artifacts (completed 2026-04-09)
 - [ ] **Phase 5: Validation and Hardening** - Add regression checks, data validations, and operator-facing safeguards for reliable local use
 
 ## Phase Details
@@ -81,9 +81,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 04-01: Define Optuna search space and trial execution wrapper
-- [ ] 04-02: Persist ranked optimization results and per-trial metrics
-- [ ] 04-03: Re-run and export the best configuration artifacts
+- [x] 04-01: Define Optuna search space and trial execution wrapper
+- [x] 04-02: Persist ranked optimization results and per-trial metrics
+- [x] 04-03: Re-run and export the best configuration artifacts
 
 ### Phase 5: Validation and Hardening
 **Goal**: Make the local workflow reliable through validation, regression protection, and safer operator feedback without expanding scope.
@@ -110,5 +110,5 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 1. Catalog Foundation | 3/3 | Complete    | 2026-04-08 |
 | 2. Backtest Runner | 3/3 | Complete    | 2026-04-08 |
 | 3. Strategy Logic | 5/5 | Complete    | 2026-04-09 |
-| 4. Optimization Workflow | 0/3 | Not started | - |
+| 4. Optimization Workflow | 3/3 | Complete    | 2026-04-09 |
 | 5. Validation and Hardening | 0/3 | Not started | - |

@@ -24,14 +24,11 @@ def write_backtest_artifacts(settings: Settings, result: dict[str, Any]) -> dict
     config_path = run_dir / "run_config.toml"
     plot_path = run_dir / "equity_curve.png"
 
-    summary_payload = _summary_payload(result)
-    summary_path.write_text(json.dumps(summary_payload, indent=2), encoding="utf-8")
-
-    trades_frame = pd.DataFrame.from_records(result.get("trade_log", []))
-    trades_frame.to_csv(trades_path, index=False)
-
-    config_path.write_text(_render_run_config_toml(settings, result), encoding="utf-8")
-    save_equity_curve_png(result["equity_curve"], plot_path)
+    persist_backtest_bundle(
+        settings=settings,
+        result=result,
+        run_dir=run_dir,
+    )
 
     if latest_dir.exists():
         shutil.rmtree(latest_dir)
@@ -47,7 +44,37 @@ def write_backtest_artifacts(settings: Settings, result: dict[str, Any]) -> dict
     }
 
 
-def _summary_payload(result: dict[str, Any]) -> dict[str, Any]:
+def persist_backtest_bundle(
+    settings: Settings,
+    result: dict[str, Any],
+    run_dir: Path,
+    summary_filename: str = "summary.json",
+    trades_filename: str = "trades.csv",
+    plot_filename: str = "equity_curve.png",
+    config_filename: str = "run_config.toml",
+) -> dict[str, Path]:
+    run_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = run_dir / summary_filename
+    trades_path = run_dir / trades_filename
+    config_path = run_dir / config_filename
+    plot_path = run_dir / plot_filename
+
+    summary_path.write_text(json.dumps(backtest_summary_payload(result), indent=2), encoding="utf-8")
+
+    trades_frame = pd.DataFrame.from_records(result.get("trade_log", []))
+    trades_frame.to_csv(trades_path, index=False)
+
+    config_path.write_text(render_run_config_toml(settings, result), encoding="utf-8")
+    save_equity_curve_png(result["equity_curve"], plot_path)
+    return {
+        "summary_path": summary_path,
+        "trades_path": trades_path,
+        "config_path": config_path,
+        "plot_path": plot_path,
+    }
+
+
+def backtest_summary_payload(result: dict[str, Any]) -> dict[str, Any]:
     return {
         "mode": result["mode"],
         "instrument_id": result["instrument_id"],
@@ -67,7 +94,7 @@ def _summary_payload(result: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _render_run_config_toml(settings: Settings, result: dict[str, Any]) -> str:
+def render_run_config_toml(settings: Settings, result: dict[str, Any]) -> str:
     params = result["parameters"]
     lines = [
         "[paths]",
@@ -99,12 +126,12 @@ def _render_run_config_toml(settings: Settings, result: dict[str, Any]) -> str:
         f'base_currency = "{settings.backtest.base_currency}"',
         f'starting_balance = "{settings.backtest.starting_balance}"',
         f"default_leverage = {settings.backtest.default_leverage}",
-        f'trade_size = "{params["trade_size"]}"',
+        f"trade_size = \"{params.get('trade_size', settings.backtest.trade_size)}\"",
         f'results_subdir = "{settings.backtest.results_subdir}"',
         f'roll_preference = "{settings.backtest.roll_preference}"',
         f"calendar_roll_business_days = {settings.backtest.calendar_roll_business_days}",
-        f'start_date = "{params["start_date"] or ""}"',
-        f'end_date = "{params["end_date"] or ""}"',
+        f"start_date = \"{params.get('start_date') or ''}\"",
+        f"end_date = \"{params.get('end_date') or ''}\"",
         f"commission_per_side = {settings.backtest.commission_per_side}",
         f"slippage_ticks = {settings.backtest.slippage_ticks}",
         "",
@@ -112,20 +139,31 @@ def _render_run_config_toml(settings: Settings, result: dict[str, Any]) -> str:
         f'native_max_order_submit_rate = "{settings.risk.native_max_order_submit_rate}"',
         f'native_max_order_modify_rate = "{settings.risk.native_max_order_modify_rate}"',
         f"native_max_notional_per_order = {_render_notional_table(settings.risk.native_max_notional_per_order)}",
-        f"max_loss_per_trade_dollars = {params['max_loss_per_trade_dollars']}",
-        f"max_daily_trades = {params['max_daily_trades']}",
-        f"max_daily_loss_dollars = {params['max_daily_loss_dollars']}",
-        f"max_consecutive_losses = {params['max_consecutive_losses']}",
-        f"max_drawdown_pct = {params['max_drawdown_pct']}",
+        f"max_loss_per_trade_dollars = {params.get('max_loss_per_trade_dollars', settings.risk.max_loss_per_trade_dollars)}",
+        f"max_daily_trades = {params.get('max_daily_trades', settings.risk.max_daily_trades)}",
+        f"max_daily_loss_dollars = {params.get('max_daily_loss_dollars', settings.risk.max_daily_loss_dollars)}",
+        f"max_consecutive_losses = {params.get('max_consecutive_losses', settings.risk.max_consecutive_losses)}",
+        f"max_drawdown_pct = {params.get('max_drawdown_pct', settings.risk.max_drawdown_pct)}",
         "",
         "[optimization]",
         f'study_name = "{settings.optimization.study_name}"',
         f'direction = "{settings.optimization.direction}"',
+        f'results_subdir = "{settings.optimization.results_subdir}"',
+        f'storage_filename = "{settings.optimization.storage_filename}"',
+        f"seed = {settings.optimization.seed}",
+        f"max_trials = {settings.optimization.max_trials}",
+        f"max_runtime_seconds = {settings.optimization.max_runtime_seconds}",
+        f"early_stop_window = {settings.optimization.early_stop_window}",
+        f"early_stop_min_improvement = {settings.optimization.early_stop_min_improvement}",
+        f'in_sample_start = "{settings.optimization.in_sample_start}"',
+        f'in_sample_end = "{settings.optimization.in_sample_end}"',
+        f'holdout_start = "{settings.optimization.holdout_start}"',
+        f'holdout_end = "{settings.optimization.holdout_end}"',
         "",
         "[run]",
         f'mode = "{result["mode"]}"',
-        f'instrument_id = "{params["instrument_id"] or ""}"',
-        f'roll_source = "{params["roll_source"]}"',
+        f"instrument_id = \"{params.get('instrument_id') or ''}\"",
+        f"roll_source = \"{params.get('roll_source', '')}\"",
     ]
     return "\n".join(lines) + "\n"
 

@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
-status: ready_to_execute
-stopped_at: Phase 4 planned
-last_updated: "2026-04-09T02:05:00.000Z"
-last_activity: 2026-04-09 - Phase 4 planned, ready to execute
+status: ready_to_plan
+stopped_at: Phase 4 completed
+last_updated: "2026-04-09T02:30:00.000Z"
+last_activity: 2026-04-09 - Phase 4 completed, ready to plan Phase 5
 progress:
   total_phases: 5
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 17
-  completed_plans: 11
-  percent: 65
+  completed_plans: 14
+  percent: 82
 ---
 
 # Project State
@@ -21,16 +21,16 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Reliable MGC data ingestion and trustworthy event-driven backtests that make optimization results credible enough to act on.
-**Current focus:** Phase 4 - Optimization Workflow
+**Current focus:** Phase 5 - Validation and Hardening
 
 ## Current Position
 
-Phase: 4 of 5 (Optimization Workflow)
+Phase: 5 of 5 (Validation and Hardening)
 Plan: 0 of 3 in current phase
-Status: Ready to execute
-Last activity: 2026-04-09 - Phase 4 planned, ready to execute
+Status: Ready to plan
+Last activity: 2026-04-09 - Phase 4 completed, ready to plan Phase 5
 
-Progress: [######----] 62%
+Progress: [########--] 82%
 
 ## Performance Metrics
 
@@ -78,14 +78,12 @@ None yet.
 ### Blockers/Concerns
 
 - Nautilus-specific implementation should continue to reference `nt_docs/` for adapter/backtest details
-- Phase 4 should keep using the shared `run_backtest(settings, params) -> dict` core rather than subprocess orchestration
-- Phase 4 should include the new risk parameters in the Optuna search space alongside strategy parameters
 - Future catalog-touching work must preserve the decode split:
   - definitions use legacy Cython decoding
   - bars/trades use `as_legacy_cython=False`
 
 ## Session Continuity
 
-Last session: 2026-04-09 02:05
-Stopped at: Phase 4 planned
-Resume file: .planning/phases/04-optimization-workflow/04-01-PLAN.md
+Last session: 2026-04-09 02:30
+Stopped at: Phase 4 completed
+Resume file: .planning/ROADMAP.md

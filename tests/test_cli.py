@@ -31,6 +31,9 @@ def test_settings_loader_uses_expected_sections() -> None:
     assert settings.risk.native_max_order_submit_rate == "100/00:00:01"
     assert settings.risk.max_daily_trades == 10
     assert settings.risk.max_drawdown_pct == 5.0
+    assert settings.optimization.seed == 42
+    assert settings.optimization.max_trials == 200
+    assert settings.optimization.in_sample_start == "2021-03-08T00:00:00+00:00"
 
 
 def test_cli_errors_when_config_missing() -> None:
@@ -40,8 +43,35 @@ def test_cli_errors_when_config_missing() -> None:
     assert excinfo.value.code == 2
 
 
-def test_cli_errors_for_unimplemented_commands() -> None:
-    with pytest.raises(SystemExit) as excinfo:
-        main(["optimize"])
+def test_cli_optimize_uses_shared_study_runner(monkeypatch, capsys) -> None:
+    captured: dict[str, object] = {}
 
-    assert excinfo.value.code == 2
+    def fake_run_optimization(settings, *, resume=False, study_name=None, max_trials=None, output=None):
+        captured["resume"] = resume
+        captured["study_name"] = study_name
+        captured["max_trials"] = max_trials
+        return {
+            "study_name": study_name or settings.optimization.study_name,
+            "seed": settings.optimization.seed,
+            "completed_trials": 2,
+            "failed_trials": 1,
+            "best_value": 1.75,
+            "best_params": {"supertrend_factor": 2.5},
+            "run_dir": "results/optimization/2026-04-09_000000",
+            "latest_dir": "results/optimization/latest",
+            "storage_path": "results/optimization/optuna_storage.db",
+            "best_run_dir": "results/optimization/2026-04-09_000000/best_run",
+            "holdout_summary_path": "results/optimization/2026-04-09_000000/best_run/holdout_results.json",
+            "overfit_warning": True,
+        }
+
+    monkeypatch.setattr("mgc_bt.optimization.study.run_optimization", fake_run_optimization)
+    exit_code = main(["optimize", "--resume", "--study-name", "custom-study", "--max-trials", "5"])
+    stdout = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert captured["resume"] is True
+    assert captured["study_name"] == "custom-study"
+    assert captured["max_trials"] == 5
+    assert "Study: custom-study" in stdout
+    assert "Warning: holdout Sharpe is more than 0.3 below in-sample Sharpe." in stdout
