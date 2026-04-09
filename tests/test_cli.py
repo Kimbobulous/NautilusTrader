@@ -171,6 +171,31 @@ def test_cli_optimize_can_opt_in_phase_six_analyses(monkeypatch, capsys) -> None
     assert captured["skip_stability"] is False
 
 
+def test_cli_optimize_reports_walk_forward_summary(monkeypatch, capsys) -> None:
+    def fake_run_optimization(settings, **kwargs):
+        return {
+            "study_name": settings.optimization.study_name,
+            "seed": settings.optimization.seed,
+            "completed_trials": 6,
+            "failed_trials": 1,
+            "best_value": 0.9,
+            "best_params": {"supertrend_factor": 2.5},
+            "run_dir": "results/optimization/2026-04-09_000000",
+            "latest_dir": None,
+            "storage_path": "results/optimization/optuna_storage.db",
+            "walk_forward_summary_path": "results/optimization/2026-04-09_000000/walk_forward/aggregated_summary.json",
+            "walk_forward_counts": {"completed": 4, "skipped": 1, "inconclusive": 2},
+        }
+
+    monkeypatch.setattr("mgc_bt.optimization.study.run_optimization", fake_run_optimization)
+    exit_code = main(["optimize", "--walk-forward"])
+    stdout = capsys.readouterr().out
+
+    assert exit_code == 0
+    assert "Walk-forward summary: results/optimization/2026-04-09_000000/walk_forward/aggregated_summary.json" in stdout
+    assert "Walk-forward windows: completed=4, skipped=1, inconclusive=2" in stdout
+
+
 def test_cli_backtest_reports_missing_catalog_with_actionable_error(tmp_path: Path) -> None:
     config_path = _write_settings_file(
         tmp_path / "settings.toml",

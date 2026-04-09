@@ -12,6 +12,8 @@ from mgc_bt.config import PathsConfig
 from mgc_bt.config import load_settings
 from mgc_bt.optimization.results import ranked_trial_rows
 from mgc_bt.optimization.study import run_optimization
+from mgc_bt.optimization.walk_forward import WalkForwardAggregateSummary
+from mgc_bt.optimization.walk_forward import WalkForwardWindowResult
 
 
 def test_ranked_trial_rows_use_locked_tie_break_order() -> None:
@@ -230,6 +232,140 @@ def test_run_optimization_can_leave_latest_untouched(tmp_path, monkeypatch) -> N
     assert not (result["run_dir"].parent / "latest").exists()
     manifest_payload = json.loads((result["run_dir"] / "manifest.json").read_text(encoding="utf-8"))
     assert manifest_payload["latest_refreshed"] is False
+
+
+def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -> None:
+    settings = _temp_settings(tmp_path)
+
+    monkeypatch.setattr(
+        "mgc_bt.optimization.study.run_walk_forward_optimization",
+        lambda *args, **kwargs: {
+            "windows": [],
+            "failed_trials": [],
+            "final_test_result": None,
+            "window_results": [
+                WalkForwardWindowResult(
+                    window_index=1,
+                    train_start="2021-01-01T00:00:00+00:00",
+                    train_end="2022-01-01T00:00:00+00:00",
+                    validation_start="2022-01-01T00:00:00+00:00",
+                    validation_end="2022-04-01T00:00:00+00:00",
+                    test_start="2022-04-01T00:00:00+00:00",
+                    test_end="2022-07-01T00:00:00+00:00",
+                    status="completed",
+                    skipped_reason=None,
+                    inconclusive=False,
+                    training_bar_count=60000,
+                    training_completed_trials=3,
+                    training_sharpe=1.2,
+                    validation_sharpe=1.1,
+                    validation_max_drawdown_pct=9.0,
+                    validation_total_pnl=1000.0,
+                    test_sharpe=0.9,
+                    test_total_pnl=800.0,
+                    test_total_trades=20,
+                    test_bar_count=15000,
+                    selected_params={"supertrend_factor": 2.5},
+                    test_result={
+                        "mode": "auto_roll",
+                        "instrument_id": "AUTO_ROLL:MGC",
+                        "segment_instruments": ["MGCJ1.GLBX"],
+                        "segment_count": 1,
+                        "start_date": "2022-04-01T00:00:00+00:00",
+                        "end_date": "2022-07-01T00:00:00+00:00",
+                        "total_pnl": 800.0,
+                        "sharpe_ratio": 0.9,
+                        "win_rate": 55.0,
+                        "max_drawdown": 250.0,
+                        "max_drawdown_pct": 10.0,
+                        "total_trades": 20,
+                        "parameters": {"supertrend_factor": 2.5},
+                        "segments": [],
+                        "trade_log": [],
+                        "equity_curve": [
+                            {"timestamp": "2022-04-01T00:00:00+00:00", "equity": 50000.0},
+                            {"timestamp": "2022-07-01T00:00:00+00:00", "equity": 50800.0},
+                        ],
+                    },
+                ),
+                WalkForwardWindowResult(
+                    window_index=2,
+                    train_start="2021-04-01T00:00:00+00:00",
+                    train_end="2022-04-01T00:00:00+00:00",
+                    validation_start="2022-04-01T00:00:00+00:00",
+                    validation_end="2022-07-01T00:00:00+00:00",
+                    test_start="2022-07-01T00:00:00+00:00",
+                    test_end="2022-10-01T00:00:00+00:00",
+                    status="inconclusive",
+                    skipped_reason=None,
+                    inconclusive=True,
+                    training_bar_count=61000,
+                    training_completed_trials=2,
+                    training_sharpe=1.0,
+                    validation_sharpe=0.8,
+                    validation_max_drawdown_pct=12.0,
+                    validation_total_pnl=500.0,
+                    test_sharpe=0.2,
+                    test_total_pnl=100.0,
+                    test_total_trades=5,
+                    test_bar_count=15000,
+                    selected_params={"supertrend_factor": 2.0},
+                    test_result={
+                        "mode": "auto_roll",
+                        "instrument_id": "AUTO_ROLL:MGC",
+                        "segment_instruments": ["MGCQ1.GLBX"],
+                        "segment_count": 1,
+                        "start_date": "2022-07-01T00:00:00+00:00",
+                        "end_date": "2022-10-01T00:00:00+00:00",
+                        "total_pnl": 100.0,
+                        "sharpe_ratio": 0.2,
+                        "win_rate": 40.0,
+                        "max_drawdown": 300.0,
+                        "max_drawdown_pct": 12.0,
+                        "total_trades": 5,
+                        "parameters": {"supertrend_factor": 2.0},
+                        "segments": [],
+                        "trade_log": [],
+                        "equity_curve": [
+                            {"timestamp": "2022-07-01T00:00:00+00:00", "equity": 50800.0},
+                            {"timestamp": "2022-10-01T00:00:00+00:00", "equity": 50900.0},
+                        ],
+                    },
+                ),
+            ],
+            "aggregate": WalkForwardAggregateSummary(
+                completed_window_count=1,
+                skipped_window_count=0,
+                inconclusive_window_count=1,
+                aggregated_oos_sharpe=0.9,
+                aggregated_oos_total_pnl=800.0,
+                aggregated_equity_curve=[
+                    {"timestamp": "2022-04-01T00:00:00+00:00", "equity": 50000.0},
+                    {"timestamp": "2022-07-01T00:00:00+00:00", "equity": 50800.0},
+                ],
+                selected_params=[
+                    {"window_index": 1, "supertrend_factor": 2.5},
+                    {"window_index": 2, "supertrend_factor": 2.0},
+                ],
+                status="completed",
+            ),
+        },
+    )
+
+    result = run_optimization(settings, study_name="wf-test", max_trials=2, walk_forward=True)
+
+    walk_root = result["run_dir"] / "walk_forward"
+    assert (walk_root / "window_results.csv").exists()
+    assert (walk_root / "aggregated_summary.json").exists()
+    assert (walk_root / "equity_curve.png").exists()
+    assert (walk_root / "params_over_time.csv").exists()
+
+    summary_payload = json.loads((walk_root / "aggregated_summary.json").read_text(encoding="utf-8"))
+    assert summary_payload["schema_version"] == 1
+    assert summary_payload["analysis_type"] == "walk_forward"
+    assert summary_payload["status"] == "completed"
+    assert summary_payload["completed_window_count"] == 1
+    assert summary_payload["inconclusive_window_count"] == 1
 
 
 def _temp_settings(tmp_path: Path):

@@ -5,6 +5,7 @@ import optuna
 from mgc_bt.config import load_settings
 from mgc_bt.optimization.objective import OBJECTIVE_PENALTY
 from mgc_bt.optimization.objective import TrialEvaluator
+from mgc_bt.optimization.objective import evaluate_params
 from mgc_bt.optimization.objective import compute_objective_score
 from mgc_bt.optimization.search_space import optimized_param_names
 from mgc_bt.optimization.search_space import sample_trial_params
@@ -88,3 +89,40 @@ def test_trial_evaluator_calls_shared_runner(monkeypatch) -> None:
     assert params["start_date"] == settings.optimization.in_sample_start
     assert params["end_date"] == settings.optimization.in_sample_end
     assert params["instrument_id"] is None
+
+
+def test_evaluate_params_routes_walk_forward_windows_through_shared_runner(monkeypatch) -> None:
+    settings = load_settings("configs/settings.toml")
+    captured: dict[str, object] = {}
+
+    def fake_run_backtest(passed_settings, params):
+        captured["settings"] = passed_settings
+        captured["params"] = params
+        return {
+            "mode": "auto_roll",
+            "instrument_id": "AUTO_ROLL:MGC",
+            "start_date": params["start_date"],
+            "end_date": params["end_date"],
+            "sharpe_ratio": 0.9,
+            "total_pnl": 120.0,
+            "win_rate": 45.0,
+            "max_drawdown": 50.0,
+            "max_drawdown_pct": 4.0,
+            "total_trades": 12,
+            "parameters": params,
+        }
+
+    monkeypatch.setattr("mgc_bt.optimization.objective.run_backtest", fake_run_backtest)
+    result = evaluate_params(
+        settings,
+        {"supertrend_factor": 2.5},
+        start_date="2022-01-01T00:00:00+00:00",
+        end_date="2022-02-01T00:00:00+00:00",
+        evaluation_window="validation",
+    )
+
+    assert captured["settings"] == settings
+    assert captured["params"]["start_date"] == "2022-01-01T00:00:00+00:00"
+    assert captured["params"]["end_date"] == "2022-02-01T00:00:00+00:00"
+    assert captured["params"]["instrument_id"] is None
+    assert result["evaluation_window"] == "validation"

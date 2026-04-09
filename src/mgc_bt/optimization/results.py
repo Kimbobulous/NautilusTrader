@@ -210,6 +210,81 @@ def write_optimization_manifest(run_dir: Path, *, latest_refreshed: bool) -> Pat
     return write_manifest(run_dir, files, latest_refreshed=latest_refreshed)
 
 
+def write_walk_forward_artifacts(
+    run_dir: Path,
+    aggregate_summary: dict[str, Any],
+    window_rows: list[dict[str, Any]],
+    *,
+    final_test_result: dict[str, Any] | None = None,
+) -> dict[str, Path]:
+    walk_root = run_dir / "walk_forward"
+    walk_root.mkdir(parents=True, exist_ok=True)
+
+    window_results_path = walk_root / "window_results.csv"
+    window_fieldnames = [
+        "window_index",
+        "train_start",
+        "train_end",
+        "validation_start",
+        "validation_end",
+        "test_start",
+        "test_end",
+        "status",
+        "skipped_reason",
+        "inconclusive",
+        "training_bar_count",
+        "training_completed_trials",
+        "training_sharpe",
+        "validation_sharpe",
+        "validation_max_drawdown_pct",
+        "validation_total_pnl",
+        "test_sharpe",
+        "test_total_pnl",
+        "test_total_trades",
+        "test_bar_count",
+    ]
+    with window_results_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=window_fieldnames)
+        writer.writeheader()
+        for row in window_rows:
+            writer.writerow({key: row.get(key) for key in window_fieldnames})
+
+    summary_path = walk_root / "aggregated_summary.json"
+    summary_path.write_text(json.dumps(aggregate_summary, indent=2), encoding="utf-8")
+
+    equity_curve_path = walk_root / "equity_curve.png"
+    save_equity_curve_png(aggregate_summary["aggregated_equity_curve"], equity_curve_path)
+
+    params_path = walk_root / "params_over_time.csv"
+    param_fieldnames = ["window_index", *optimized_param_names()]
+    with params_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=param_fieldnames)
+        writer.writeheader()
+        for row in aggregate_summary.get("selected_params", []):
+            writer.writerow({key: row.get(key) for key in param_fieldnames})
+
+    outputs = {
+        "walk_root": walk_root,
+        "window_results_path": window_results_path,
+        "summary_path": summary_path,
+        "equity_curve_path": equity_curve_path,
+        "params_over_time_path": params_path,
+    }
+
+    if final_test_result is not None:
+        final_test_summary = walk_root / "final_test_summary.json"
+        final_test_plot = walk_root / "final_test_equity_curve.png"
+        final_test_summary.write_text(
+            json.dumps(backtest_summary_payload(final_test_result), indent=2),
+            encoding="utf-8",
+        )
+        save_equity_curve_png(final_test_result["equity_curve"], final_test_plot)
+        outputs["final_test_summary_path"] = final_test_summary
+        outputs["final_test_plot_path"] = final_test_plot
+
+    return outputs
+
+
 def _float_or_none(value: Any) -> float | None:
     if value is None:
         return None

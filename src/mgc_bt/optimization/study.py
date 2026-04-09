@@ -19,6 +19,7 @@ from mgc_bt.optimization.results import create_optimization_run_dir
 from mgc_bt.optimization.results import failed_trial_rows
 from mgc_bt.optimization.results import ranked_trial_rows
 from mgc_bt.optimization.results import refresh_latest_results
+from mgc_bt.optimization.results import write_walk_forward_artifacts
 from mgc_bt.optimization.results import write_optimization_manifest
 from mgc_bt.optimization.results import write_failed_trials_json
 from mgc_bt.optimization.results import write_optimization_run_config
@@ -26,6 +27,7 @@ from mgc_bt.optimization.results import write_optimization_summary_json
 from mgc_bt.optimization.results import write_ranked_results_csv
 from mgc_bt.optimization.storage import optimization_storage_path
 from mgc_bt.optimization.storage import optimization_storage_url
+from mgc_bt.optimization.walk_forward import run_walk_forward_optimization
 
 
 @dataclass
@@ -67,6 +69,17 @@ def run_optimization(
         skip_stability=skip_stability,
     )
     final_test_window = _final_test_window(settings)
+    if walk_forward:
+        return _run_walk_forward_branch(
+            settings,
+            study_name=study_name,
+            max_trials=max_trials,
+            refresh_latest=refresh_latest,
+            output=out,
+            final_test=final_test,
+            analysis_flags=analysis_flags,
+            final_test_window=final_test_window,
+        )
     effective_study_name = study_name or settings.optimization.study_name
     effective_max_trials = max_trials or settings.optimization.max_trials
     storage_path = optimization_storage_path(settings)
@@ -236,6 +249,102 @@ def run_optimization(
     }
 
 
+def _run_walk_forward_branch(
+    settings: Settings,
+    *,
+    study_name: str | None,
+    max_trials: int | None,
+    refresh_latest: bool,
+    output: TextIO,
+    final_test: bool,
+    analysis_flags: dict[str, bool],
+    final_test_window: dict[str, str],
+) -> dict[str, Any]:
+    effective_study_name = study_name or settings.optimization.study_name
+    effective_max_trials = max_trials or settings.optimization.max_trials
+    storage_path = optimization_storage_path(settings)
+    run_dir = create_optimization_run_dir(settings)
+    started_at = time.perf_counter()
+    walk_forward_run = run_walk_forward_optimization(
+        settings,
+        study_name=effective_study_name,
+        max_trials=effective_max_trials,
+        output=output,
+        final_test=final_test,
+    )
+    aggregate = walk_forward_run["aggregate"]
+    window_results = walk_forward_run["window_results"]
+    walk_forward_summary = {
+        "schema_version": 1,
+        "run_type": "optimize",
+        "analysis_type": "walk_forward",
+        "completed_window_count": aggregate.completed_window_count,
+        "skipped_window_count": aggregate.skipped_window_count,
+        "inconclusive_window_count": aggregate.inconclusive_window_count,
+        "aggregated_oos_sharpe": aggregate.aggregated_oos_sharpe,
+        "aggregated_oos_total_pnl": aggregate.aggregated_oos_total_pnl,
+        "aggregated_equity_curve": aggregate.aggregated_equity_curve,
+        "selected_params": aggregate.selected_params,
+        "status": aggregate.status,
+        "final_test_executed": walk_forward_run["final_test_result"] is not None,
+    }
+    artifact_paths = write_walk_forward_artifacts(
+        run_dir,
+        walk_forward_summary,
+        [_window_result_row(item) for item in window_results],
+        final_test_result=walk_forward_run["final_test_result"],
+    )
+    write_failed_trials_json(run_dir, walk_forward_run["failed_trials"])
+    summary = {
+        "study_name": effective_study_name,
+        "seed": settings.optimization.seed,
+        "completed_trials": sum(item.training_completed_trials for item in window_results),
+        "failed_trials": len(walk_forward_run["failed_trials"]),
+        "runtime_seconds": round(time.perf_counter() - started_at, 4),
+        "storage_path": storage_path.as_posix(),
+        "best_params": aggregate.selected_params[-1] if aggregate.selected_params else {},
+        "best_value": aggregate.aggregated_oos_sharpe,
+        "walk_forward_summary_path": artifact_paths["summary_path"].as_posix(),
+        "walk_forward_window_results_path": artifact_paths["window_results_path"].as_posix(),
+        "walk_forward_counts": {
+            "completed": aggregate.completed_window_count,
+            "skipped": aggregate.skipped_window_count,
+            "inconclusive": aggregate.inconclusive_window_count,
+        },
+        "overfit_warning": False,
+    }
+    _attach_phase_six_metadata(summary, analysis_flags, final_test_window)
+    summary_path = write_optimization_summary_json(run_dir, summary)
+    run_config_path = write_optimization_run_config(
+        settings,
+        run_dir,
+        aggregate.selected_params[-1] if aggregate.selected_params else {},
+        analysis_flags=analysis_flags,
+        final_test_window=final_test_window,
+    )
+    write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
+    latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
+    return {
+        "run_dir": run_dir,
+        "latest_dir": latest_dir,
+        "summary_path": summary_path,
+        "run_config_path": run_config_path,
+        "storage_path": storage_path,
+        "study_name": effective_study_name,
+        "seed": settings.optimization.seed,
+        "completed_trials": summary["completed_trials"],
+        "failed_trials": len(walk_forward_run["failed_trials"]),
+        "best_params": summary["best_params"],
+        "best_value": aggregate.aggregated_oos_sharpe,
+        "walk_forward_summary_path": artifact_paths["summary_path"],
+        "walk_forward_counts": summary["walk_forward_counts"],
+        "holdout_summary_path": artifact_paths.get("final_test_summary_path"),
+        "holdout_plot_path": artifact_paths.get("final_test_plot_path"),
+        "overfit_warning": False,
+        "analysis_flags": analysis_flags,
+    }
+
+
 def _progress_callback(runtime: OptimizationRuntime):
     def callback(study: optuna.study.Study, trial: optuna.trial.FrozenTrial) -> None:
         elapsed = time.perf_counter() - runtime.start_time
@@ -380,3 +489,29 @@ def _attach_phase_six_metadata(
     summary["analysis_flags"] = analysis_flags
     summary.update(analysis_flags)
     summary["final_test_window"] = final_test_window
+
+
+def _window_result_row(result: Any) -> dict[str, Any]:
+    return {
+        "window_index": result.window_index,
+        "train_start": result.train_start,
+        "train_end": result.train_end,
+        "validation_start": result.validation_start,
+        "validation_end": result.validation_end,
+        "test_start": result.test_start,
+        "test_end": result.test_end,
+        "status": result.status,
+        "skipped_reason": result.skipped_reason,
+        "inconclusive": result.inconclusive,
+        "training_bar_count": result.training_bar_count,
+        "training_completed_trials": result.training_completed_trials,
+        "training_sharpe": result.training_sharpe,
+        "validation_sharpe": result.validation_sharpe,
+        "validation_max_drawdown_pct": result.validation_max_drawdown_pct,
+        "validation_total_pnl": result.validation_total_pnl,
+        "test_sharpe": result.test_sharpe,
+        "test_total_pnl": result.test_total_pnl,
+        "test_total_trades": result.test_total_trades,
+        "test_bar_count": result.test_bar_count,
+        "selected_params": result.selected_params,
+    }
