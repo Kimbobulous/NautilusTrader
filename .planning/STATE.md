@@ -3,9 +3,9 @@ gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
 status: executing
-stopped_at: Phase 7 execution complete
-last_updated: "2026-04-09T12:00:00.000Z"
-last_activity: 2026-04-09 -- Phase 07 execution complete
+stopped_at: Phase 8 context gathered
+last_updated: "2026-04-09T12:30:00.000Z"
+last_activity: 2026-04-09 -- Phase 08 context gathered
 progress:
   total_phases: 4
   completed_phases: 2
@@ -21,14 +21,14 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Reliable MGC data ingestion and trustworthy event-driven backtests that make optimization results credible enough to act on.
-**Current focus:** Phase 7 - Analytics and Audit Layer
+**Current focus:** Phase 8 - Interactive Tearsheet Reporting
 
 ## Current Position
 
-Phase: 7 - Analytics and Audit Layer
-Plan: All plans complete
-Status: Completed
-Last activity: 2026-04-09 -- Phase 07 execution complete
+Phase: 8 - Interactive Tearsheet Reporting
+Plan: Context gathered
+Status: Ready for planning
+Last activity: 2026-04-09 -- Phase 08 context gathered
 
 Progress: [#####-----] 50%
 
@@ -46,13 +46,13 @@ Progress: [#####-----] 50%
 |-------|-------|-------|----------|
 | 6 | 4 | Completed | Baseline established |
 | 7 | 4 | Completed | Baseline extended |
-| 8 | - | - | - |
+| 8 | - | Context gathered | - |
 | 9 | - | - | - |
 
 **Recent Trend:**
 
 - Last 5 plans: 06-04, 07-01, 07-02, 07-03, 07-04 completed
-- Trend: Phase 7 shipped cleanly; Phase 8 is unblocked
+- Trend: Phase 8 context is locked; planning is unblocked
 
 ## Accumulated Context
 
@@ -81,6 +81,8 @@ Recent decisions affecting current work:
 - Phase 7: Analytics must generate automatically after `backtest` and `optimize`, but analytics failures must warn and never block core result persistence
 - Phase 7: Audit logs must capture every `PULLBACK_ARMED` setup considered, not just executed trades
 - Phase 7: Phase 8 tearsheets should read analytics from filesystem artifacts under `analytics/` rather than rerunning backtests
+- Phase 8: Tearsheets must be self-contained `tearsheet.html` files generated automatically and added to the run manifest
+- Phase 8: Missing section inputs should render explicit section-level notices instead of silently dropping content
 
 ### Pending Todos
 
@@ -101,5 +103,5 @@ Recent decisions affecting current work:
 ## Session Continuity
 
 Last session: 2026-04-09 01:00
-Stopped at: Phase 7 execution complete
+Stopped at: Phase 8 context gathered
 Resume file: .planning/ROADMAP.md
