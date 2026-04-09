@@ -77,7 +77,7 @@
 
 | Requirement | Phase | Status |
 |-------------|-------|--------|
-| CLI-01 | Phase 1 | Completed |
+| CLI-01 | Phase 5 | Completed |
 | CLI-02 | Phase 1 | Completed |
 | CLI-03 | Phase 1 | Completed |
 | DATA-01 | Phase 1 | Completed |
@@ -85,13 +85,13 @@
 | DATA-03 | Phase 1 | Completed |
 | DATA-04 | Phase 1 | Completed |
 | DATA-05 | Phase 1 | Completed |
-| DATA-06 | Phase 1 | Completed |
+| DATA-06 | Phase 5 | Completed |
 | BT-01 | Phase 2 | Completed |
 | BT-02 | Phase 2 | Completed |
 | BT-03 | Phase 2 | Completed |
 | BT-04 | Phase 2 | Completed |
 | BT-05 | Phase 2 | Completed |
-| BT-06 | Phase 2 | Completed |
+| BT-06 | Phase 5 | Completed |
 | BT-07 | Phase 2 | Completed |
 | STRAT-01 | Phase 3 | Completed |
 | STRAT-02 | Phase 3 | Completed |
@@ -102,7 +102,7 @@
 | OPT-02 | Phase 4 | Completed |
 | OPT-03 | Phase 4 | Completed |
 | OPT-04 | Phase 4 | Completed |
-| OPT-05 | Phase 4 | Completed |
+| OPT-05 | Phase 5 | Completed |
 
 **Coverage:**
 - v1 requirements: 26 total
@@ -111,4 +111,4 @@
 
 ---
 *Requirements defined: 2026-04-08*
-*Last updated: 2026-04-09 after Phase 4 completion*
+*Last updated: 2026-04-09 after Phase 5 completion*

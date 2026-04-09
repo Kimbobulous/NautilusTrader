@@ -22,10 +22,12 @@ Reliable MGC data ingestion and trustworthy event-driven backtests that make opt
   Validated in Phase 2: Backtest Runner
 - [x] Optimize strategy and approved custom risk parameters with Optuna and persist ranked in-sample plus holdout-evaluation results
   Validated in Phase 4: Optimization Workflow
+- [x] Run the local workflow with shared readiness checks, safer result persistence, and repeatable operator guidance
+  Validated in Phase 5: Validation and Hardening
 
 ### Active
 
-- [ ] Add validation and hardening safeguards for repeated local research use
+- [ ] No active v1 requirements remain
 
 ### Out of Scope
 
@@ -73,6 +75,8 @@ The local documentation folder `nt_docs/` is a required reference source before 
 | Include commissions and slippage from v1 | Backtest trust matters more than optimistic raw signal results | Phase 2 implements commission, one-tick slippage, and next-bar timing through Nautilus-native venue/fill/latency configuration |
 | Keep v1 to MGC futures, rule-based logic, and local Databento files only | Prevents scope creep while establishing a credible research baseline | Phase 1 filters the catalog to outright MGC futures contracts and local Databento files only |
 | Keep Phase 4 optimization on the shared catalog-backed runner instead of forcing a low-level `BacktestEngine.reset()` rewrite | Nautilus supports `reset()` for in-memory repeated runs, but the full bars-plus-trades dataset is better matched to the high-level catalog-backed `BacktestNode` path | Phase 4 documents and preserves the high-level runner for optimization while keeping the decision explicit |
+| Add shared preflight validation and a `health` command instead of separate ad hoc setup checks | Local repeatability depends more on actionable readiness feedback than on extra features | Phase 5 centralizes command checks and exposes one readiness summary surface |
+| Retain a shared Nautilus log guard across repeated backtest runs | Repeated in-process `BacktestNode` runs can destabilize logging on this install if the guard is dropped between runs | Phase 5 keeps the runner stable for optimization reruns and holdout execution |
 
 ## Evolution
 
@@ -92,4 +96,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-09 after Phase 4 execution*
+*Last updated: 2026-04-09 after Phase 5 execution*

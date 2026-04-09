@@ -14,7 +14,7 @@ This roadmap builds the system in dependency order: first establish a clean loca
 - [x] **Phase 2: Backtest Runner** - Wire Nautilus backtest execution, venue assumptions, and reporting outputs (completed 2026-04-08)
 - [x] **Phase 3: Strategy Logic** - Implement the MGC trend-following pullback strategy inside Nautilus event handlers (completed 2026-04-09)
 - [x] **Phase 4: Optimization Workflow** - Add Optuna parameter search with ranked outputs and best-run artifacts (completed 2026-04-09)
-- [ ] **Phase 5: Validation and Hardening** - Add regression checks, data validations, and operator-facing safeguards for reliable local use
+- [x] **Phase 5: Validation and Hardening** - Add regression checks, data validations, and operator-facing safeguards for reliable local use (completed 2026-04-09)
 
 ## Phase Details
 
@@ -96,9 +96,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 05-01: Add automated tests for core non-strategy workflow components
-- [ ] 05-02: Add stronger validation and error reporting for configuration and data assumptions
-- [ ] 05-03: Polish local usability and documentation for repeatable operation
+- [x] 05-01: Add automated tests for core non-strategy workflow components
+- [x] 05-02: Add stronger validation and error reporting for configuration and data assumptions
+- [x] 05-03: Polish local usability and documentation for repeatable operation
 
 ## Progress
 
@@ -111,4 +111,4 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 | 2. Backtest Runner | 3/3 | Complete    | 2026-04-08 |
 | 3. Strategy Logic | 5/5 | Complete    | 2026-04-09 |
 | 4. Optimization Workflow | 3/3 | Complete    | 2026-04-09 |
-| 5. Validation and Hardening | 0/3 | Not started | - |
+| 5. Validation and Hardening | 3/3 | Complete    | 2026-04-09 |
