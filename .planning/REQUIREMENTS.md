@@ -1,0 +1,60 @@
+# Milestone v1.1 Requirements
+
+## Research Integrity
+
+- [ ] **INT-01**: User can run walk-forward optimization that repeatedly optimizes on an in-sample window and evaluates the next out-of-sample window, then aggregates the results.
+- [ ] **INT-02**: User can validate a strategy with Monte Carlo permutation and return-resampling analysis to distinguish edge from luck.
+- [ ] **INT-03**: User can inspect parameter stability across the search space to identify robust versus fragile parameter regions.
+- [ ] **INT-04**: User can enforce a proper train/validate/test split where the final test window is never touched until final evaluation.
+
+## Analytics and Audit
+
+- [ ] **ANL-01**: User can review a full trade audit log showing each signal, the indicator state at that moment, and the reason a trade was taken or rejected.
+- [ ] **ANL-02**: User can analyze performance by session, volatility regime, month, and year.
+- [ ] **ANL-03**: User can inspect drawdown duration, recovery time, and an underwater equity view in addition to headline drawdown depth.
+- [ ] **ANL-04**: User can see parameter sensitivity metrics that quantify how performance changes per unit movement in each optimized parameter.
+
+## Visualization
+
+- [ ] **VIZ-01**: User can receive a self-contained interactive Plotly tearsheet automatically after each backtest run.
+- [ ] **VIZ-02**: User can receive a self-contained interactive Plotly tearsheet automatically after each optimization run, including walk-forward and Monte Carlo visuals when available.
+- [ ] **VIZ-03**: User can open each tearsheet as a single HTML file in any browser without additional services or dependencies.
+
+## Platform Reusability
+
+- [ ] **PLT-01**: User can implement future strategies by extending a generic strategy base class with minimal boilerplate.
+- [ ] **PLT-02**: User can reuse the current strategy indicators as a standardized standalone indicator library without changing existing strategy behavior.
+- [ ] **PLT-03**: User can switch which strategy runs through configuration rather than editing runner code.
+- [ ] **PLT-04**: User can compare two strategies on the same data and review their results side by side.
+
+## Future Requirements
+
+- [ ] Add live trading and paper trading support in a future major milestone.
+- [ ] Support multi-instrument and portfolio-level research workflows.
+- [ ] Add new data sources beyond the existing local Databento workflow.
+
+## Out of Scope
+
+- New strategy logic for the current MGC system - this milestone is about research confidence and platform layers, not changing the existing edge logic.
+- Replacing the current Nautilus backtest core - v1.1 extends the current platform instead of rebuilding it.
+- Separate commands for tearsheets or walk-forward testing - tearsheets should be automatic and walk-forward should extend `optimize`.
+
+## Traceability
+
+| Requirement | Phase |
+|-------------|-------|
+| INT-01 | Phase 6 |
+| INT-02 | Phase 6 |
+| INT-03 | Phase 6 |
+| INT-04 | Phase 6 |
+| ANL-01 | Phase 7 |
+| ANL-02 | Phase 7 |
+| ANL-03 | Phase 7 |
+| ANL-04 | Phase 7 |
+| VIZ-01 | Phase 8 |
+| VIZ-02 | Phase 8 |
+| VIZ-03 | Phase 8 |
+| PLT-01 | Phase 9 |
+| PLT-02 | Phase 9 |
+| PLT-03 | Phase 9 |
+| PLT-04 | Phase 9 |
