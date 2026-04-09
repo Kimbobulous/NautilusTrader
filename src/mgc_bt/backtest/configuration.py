@@ -22,6 +22,7 @@ from nautilus_trader.persistence.catalog import ParquetDataCatalog
 
 from mgc_bt.backtest.contracts import ContractSelection
 from mgc_bt.backtest.contracts import ContractWindow
+from mgc_bt.backtest.strategy_registry import resolve_strategy_registration
 from mgc_bt.config import Settings
 
 BAR_INTERVAL_NANOS = 60_000_000_000
@@ -44,6 +45,10 @@ def build_segment_run_specs(
     specs: list[SegmentRunSpec] = []
     effective_starting_balance = starting_balance or settings.backtest.starting_balance
     trade_size = Decimal(str(params.get("trade_size", settings.backtest.trade_size)))
+    registration = resolve_strategy_registration(
+        strategy=_optional_text(params.get("strategy")) or settings.backtest.strategy,
+        strategy_class=_optional_text(params.get("strategy_class")) or settings.backtest.strategy_class,
+    )
 
     for window in selection.windows:
         analytics_root = None
@@ -101,8 +106,8 @@ def build_segment_run_specs(
                                 # Catalog continuity reminder:
                                 # definitions were ingested with legacy Cython decoding,
                                 # while bars and trades were ingested with as_legacy_cython=False.
-                                strategy_path="mgc_bt.backtest.strategy:MgcProductionStrategy",
-                                config_path="mgc_bt.backtest.strategy:MgcStrategyConfig",
+                                strategy_path=registration.strategy_path,
+                                config_path=registration.config_path,
                                 config=strategy_params,
                             ),
                         ],
@@ -168,3 +173,10 @@ def build_trade_data_config(settings: Settings, window: ContractWindow) -> Backt
         start_time=window.start.isoformat(),
         end_time=window.end.isoformat(),
     )
+
+
+def _optional_text(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None

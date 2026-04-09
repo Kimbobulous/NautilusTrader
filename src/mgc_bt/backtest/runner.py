@@ -39,6 +39,8 @@ def run_backtest(settings: Settings, params: dict[str, Any] | None = None) -> di
         "instrument_id": _optional_text(raw_params.get("instrument_id")),
         "start_date": _optional_text(raw_params.get("start_date")) or settings.backtest.start_date,
         "end_date": _optional_text(raw_params.get("end_date")) or settings.backtest.end_date,
+        "strategy": _optional_text(raw_params.get("strategy")) or settings.backtest.strategy,
+        "strategy_class": _optional_text(raw_params.get("strategy_class")) or settings.backtest.strategy_class,
         "trade_size": raw_params.get("trade_size", settings.backtest.trade_size),
         "roll_source": selection.roll_source,
         "supertrend_atr_length": raw_params.get("supertrend_atr_length", settings.backtest.supertrend_atr_length),

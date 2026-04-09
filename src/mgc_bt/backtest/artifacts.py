@@ -163,6 +163,8 @@ def render_run_config_toml(settings: Settings, result: dict[str, Any]) -> str:
         "",
         "[backtest]",
         f'default_mode = "{settings.backtest.default_mode}"',
+        f'strategy = "{params.get("strategy", settings.backtest.strategy)}"',
+        f'strategy_class = "{params.get("strategy_class") or ""}"',
         f'venue_name = "{settings.backtest.venue_name}"',
         f'oms_type = "{settings.backtest.oms_type}"',
         f'account_type = "{settings.backtest.account_type}"',

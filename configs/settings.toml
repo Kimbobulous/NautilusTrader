@@ -21,6 +21,8 @@ mbp1_glob = "MBP-1_03.09.2021-11.09.2023/*.mbp-1.dbn.zst"
 
 [backtest]
 default_mode = "auto_roll"
+strategy = "mgc_production"
+strategy_class = ""
 venue_name = "GLBX"
 oms_type = "NETTING"
 account_type = "MARGIN"

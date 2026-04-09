@@ -57,6 +57,8 @@ class IngestionConfig:
 @dataclass(frozen=True)
 class BacktestConfig:
     default_mode: str
+    strategy: str
+    strategy_class: str | None
     venue_name: str
     oms_type: str
     account_type: str
@@ -205,6 +207,8 @@ def load_settings(config_path: str | Path) -> Settings:
         ),
         backtest=BacktestConfig(
             default_mode=str(_require(backtest, "default_mode", "backtest")),
+            strategy=str(backtest.get("strategy", "mgc_production")).strip(),
+            strategy_class=_optional_str(backtest.get("strategy_class")),
             venue_name=str(_require(backtest, "venue_name", "backtest")),
             oms_type=str(_require(backtest, "oms_type", "backtest")),
             account_type=str(_require(backtest, "account_type", "backtest")),
@@ -337,6 +341,11 @@ def _validate_optimization_settings(settings: Settings) -> None:
 
 
 def _validate_phase_six_settings(settings: Settings) -> None:
+    if not settings.backtest.strategy and not settings.backtest.strategy_class:
+        raise ConfigError("Backtest strategy selection requires either backtest.strategy or backtest.strategy_class.")
+    if settings.backtest.strategy_class is not None and ":" not in settings.backtest.strategy_class:
+        raise ConfigError("Backtest strategy_class must use the 'package.module:ClassName' format.")
+
     walk_forward_checks = {
         "train_months": settings.walk_forward.train_months,
         "validation_months": settings.walk_forward.validation_months,
