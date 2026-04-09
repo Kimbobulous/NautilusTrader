@@ -35,25 +35,35 @@ Reliable MGC data ingestion and trustworthy event-driven backtests that make opt
   Validated in Phase 4: Optimization Workflow
 - [x] Run the local workflow with shared readiness checks, safer result persistence, and repeatable operator guidance
   Validated in Phase 5: Validation and Hardening
+- [x] Add a research-integrity layer with walk-forward testing, Monte Carlo validation, parameter stability analysis, and a protected train/validate/test workflow
+  Validated in Phase 6: Research Integrity Framework
+- [x] Add a richer analytics and reporting layer with trade-audit detail, regime/session/calendar breakdowns, and drawdown recovery analysis
+  Validated in Phase 7: Analytics and Audit Layer
+- [x] Generate interactive self-contained Plotly tearsheets automatically after `backtest` and `optimize`
+  Validated in Phase 8: Interactive Tearsheet Reporting
+- [x] Refactor the platform for future strategy reuse through generic strategy foundations, reusable indicators, config-driven switching, and strategy comparison
+  Validated in Phase 9: Reusable Strategy Platform
 
 ### Active
 
-- [ ] Add a research-integrity layer with walk-forward testing, Monte Carlo validation, parameter stability analysis, and a protected train/validate/test workflow
-- [ ] Add a richer analytics and reporting layer with trade-audit detail, regime/session/calendar breakdowns, and drawdown recovery analysis
-- [ ] Generate interactive self-contained Plotly tearsheets automatically after `backtest` and `optimize`
-- [ ] Refactor the platform for future strategy reuse through generic strategy foundations, reusable indicators, config-driven switching, and strategy comparison
+- [ ] Add live trading and paper trading support
+- [ ] Support multi-instrument and portfolio-level research workflows
+- [ ] Add new data source integrations beyond the existing local Databento workflow
 
 ## Current State
 
-v1.0 is shipped. The repo now contains a complete local MGC research workflow with catalog ingestion, reusable backtesting, production strategy logic, optimization, and workflow hardening for repeated local use.
+v1.1 is shipped. The repo now contains a complete local MGC research platform with:
+- Databento catalog ingestion, reusable backtest runner, production MGC strategy, Optuna optimization, workflow hardening (v1.0)
+- Walk-forward optimization, Monte Carlo analysis, parameter stability (Optuna fANOVA + scikit-learn), streaming trade audit, multi-dimension performance breakdowns, drawdown episode analysis, automatic Plotly HTML tearsheets, reusable strategy base class, standalone indicator primitives, config-driven strategy registry, and side-by-side `compare` command (v1.1)
 
-v1.1 shifts from "can this strategy run?" to "can its results be trusted and compared professionally?" The existing core ingestion, backtest, strategy, optimization, and hardening layers remain the foundation; this milestone adds research validation, deep reporting, interactive visualization, and platform reuse without changing the current strategy's behavior.
+**Test count:** 89 passing
+**Python LOC:** ~11,792
 
 ## Next Milestone Goals
 
-- Build statistically stronger validation around optimization results so overfitting is easier to detect
-- Produce professional tearsheets and analytics automatically after research runs
-- Generalize the platform so future strategies can plug into the same infrastructure with minimal boilerplate
+- Live trading and paper trading support (reserved for a future major milestone)
+- Multi-instrument and portfolio-level research workflows
+- New data source integrations beyond existing local Databento files
 
 ### Out of Scope
 
@@ -134,4 +144,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-08 after starting milestone v1.1*
+*Last updated: 2026-04-09 after v1.1 milestone*

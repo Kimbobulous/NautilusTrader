@@ -1,5 +1,27 @@
 # Milestones
 
+## v1.1 Quant Research Infrastructure (Shipped: 2026-04-09)
+
+**Phases completed:** 4 phases, 16 plans
+**Files changed:** 163 | **Net LOC:** ~+4,586 | **Total Python LOC:** 11,792
+
+### Accomplishments
+
+- Added walk-forward optimization with rolling in-sample/OOS windows, time-weighted aggregate OOS metrics, and a protected final test evaluation gate.
+- Delivered deterministic Monte Carlo permutation and bootstrap analysis to distinguish genuine strategy edge from luck.
+- Integrated Optuna fANOVA parameter stability analysis with a 5×5 importance heatmap and neighborhood robustness reruns.
+- Shipped streaming trade audit capture and multi-dimension performance breakdowns (session, volatility regime, month, year, day/hour).
+- Generated automatic self-contained Plotly HTML tearsheets after every `backtest` and `optimize` run.
+- Refactored the platform for strategy reuse: thin base class, standalone indicator primitives, config-driven strategy registry, and a dedicated side-by-side `compare` command.
+
+### Notes
+
+- Archived roadmap: [.planning/milestones/v1.1-ROADMAP.md](.planning/milestones/v1.1-ROADMAP.md)
+- Archived requirements: [.planning/milestones/v1.1-REQUIREMENTS.md](.planning/milestones/v1.1-REQUIREMENTS.md)
+- All 15 requirements validated. 89 tests passing at close.
+
+---
+
 ## v1.0 - MGC Research Workflow
 
 **Shipped:** 2026-04-09
