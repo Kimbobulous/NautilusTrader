@@ -69,7 +69,7 @@
 | Automatic research mode | Attach all validation outputs to optimize with selective skip flags | x |
 | Minimal output mode | Persist only summary metrics to keep runtime and storage low | |
 
-**User's choice:** `--walk-forward` activates walk-forward automatically; Monte Carlo and stability run automatically after optimization unless explicitly skipped.
+**User's choice:** `--walk-forward` activates walk-forward automatically. Monte Carlo and stability run automatically for walk-forward research runs, while standard `optimize` keeps its current behavior unless explicitly opted into with flags like `--monte-carlo` and `--stability`.
 **Notes:** Terminal output must include per-window status and cumulative OOS performance. Walk-forward outputs go under `results/optimization/YYYY-MM-DD_HHMMSS/walk_forward/`. Monte Carlo and stability outputs sit alongside the existing optimization artifacts. If runtime is estimated to exceed 30 minutes, print a warning and estimated completion time before starting.
 
 ---

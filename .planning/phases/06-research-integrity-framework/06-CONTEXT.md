@@ -44,7 +44,7 @@ Phase 6 extends the existing optimization pipeline with statistically trustworth
 
 ### Runtime and output policy
 - **D-20:** Walk-forward runs automatically when `optimize` is invoked with `--walk-forward`.
-- **D-21:** Monte Carlo and stability analysis run automatically after every optimization, including walk-forward, but may be disabled with `--skip-monte-carlo` and `--skip-stability`.
+- **D-21:** Monte Carlo and stability analysis do not change the default `optimize` path. They run automatically for walk-forward research runs, and for non-walk-forward optimization they only run when explicitly requested with `--monte-carlo` and `--stability`.
 - **D-22:** Walk-forward terminal progress must show current window number, window date range, in-sample Sharpe, validation Sharpe, out-of-sample Sharpe, and cumulative out-of-sample performance so far.
 - **D-23:** Walk-forward outputs are saved under `results/optimization/YYYY-MM-DD_HHMMSS/walk_forward/` with:
   - `window_results.csv`
