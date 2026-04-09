@@ -12,16 +12,15 @@ Always use `nautilus_trader`'s native infrastructure as the foundation. Extend a
 
 Reliable MGC data ingestion and trustworthy event-driven backtests that make optimization results credible enough to act on.
 
-## Current Milestone: v1.1 Quant Research Infrastructure
+## Current Milestone: v1.2 Strategy Validation and Live Research
 
-**Goal:** Extend the existing MGC research platform with a professional research-integrity, analytics, and tearsheet layer so strategy results are trustworthy, explainable, and reusable.
+**Goal:** Use the shipped platform for real research: validate whether the MGC pullback strategy has genuine alpha, refine it based on evidence, implement a second contrast strategy, and prove the platform works end to end on multiple strategies.
 
 **Target features:**
-- Walk-forward testing inside `optimize`, plus proper train/validate/test handling
-- Monte Carlo testing, parameter stability analysis, and overfitting diagnostics
-- Automatic self-contained Plotly tearsheets after `backtest` and `optimize`
-- Full trade audit logging and richer analytics breakdowns
-- Reusable strategy infrastructure, indicator extraction, and strategy comparison
+- Full 5-year walk-forward optimization on MGC with tearsheet, Monte Carlo, stability, and ranked results
+- Evidence-driven analysis and refinement of the MGC strategy using actual research outputs
+- A second MGC strategy implemented on the reusable platform and compared side by side with the pullback strategy
+- Final stress-test/documentation pass with a research report and platform lessons learned
 
 ## Requirements
 
@@ -46,9 +45,10 @@ Reliable MGC data ingestion and trustworthy event-driven backtests that make opt
 
 ### Active
 
-- [ ] Add live trading and paper trading support
-- [ ] Support multi-instrument and portfolio-level research workflows
-- [ ] Add new data source integrations beyond the existing local Databento workflow
+- [ ] Run a full 5-year walk-forward optimization on the current MGC pullback strategy and produce a complete statistical research artifact bundle
+- [ ] Analyze the MGC optimization outputs, refine the strategy based on evidence, and revalidate the refinements with a follow-up optimization
+- [ ] Implement a second MGC strategy on the reusable platform and compare it side by side against the pullback strategy
+- [ ] Produce a final research report and platform validation pass covering both strategies and any end-to-end issues
 
 ## Current State
 
@@ -57,26 +57,28 @@ v1.1 is shipped. The repo now contains a complete local MGC research platform wi
 - Walk-forward optimization, Monte Carlo analysis, parameter stability (Optuna fANOVA + scikit-learn), streaming trade audit, multi-dimension performance breakdowns, drawdown episode analysis, automatic Plotly HTML tearsheets, reusable strategy base class, standalone indicator primitives, config-driven strategy registry, and side-by-side `compare` command (v1.1)
 
 **Test count:** 89 passing
-**Python LOC:** ~11,792
+**Golden fixture:** locked and must continue matching exactly
 
 ## Next Milestone Goals
 
-- Live trading and paper trading support (reserved for a future major milestone)
-- Multi-instrument and portfolio-level research workflows
-- New data source integrations beyond existing local Databento files
+- Execute real strategy research on the current MGC pullback system
+- Use research outputs to decide whether refinement improves or harms the strategy
+- Validate the reusable strategy platform by implementing and comparing a second strategy
+- End with a research report and a clean, verified multi-strategy platform
 
 ### Out of Scope
 
 - Live trading and paper trading - reserve for a future major milestone
-- Multi-instrument support - still out of scope for v1.1
+- Multi-instrument support - still out of scope for v1.2
 - New data sources - this milestone builds on the existing local Databento workflow only
-- Changes to the existing MGC strategy logic - indicator extraction and base-class refactors must preserve behavior
+- Infrastructure rewrites without a demonstrated bug - v1.2 is about using the shipped platform
+- Any workaround that bypasses `BaseResearchStrategy`, the indicator library, or the strategy registry for new strategies
 - Replacing the current core Nautilus backtest engine - extend the platform rather than rebuild it
 - Sub-minute or intrabar execution logic - v1 evaluates entries and exits on completed 1-minute bars only
-- Dashboards or web UI - CLI-first local workflow is sufficient for v1
-- Distributed optimization - local repeatable optimization is enough for v1
-- Portfolio analytics - v1 focuses on single-strategy, single-instrument evaluation
-- Machine learning models such as Lorentzian or MLMI - v1 is pure rule-based logic only
+- Dashboards or web UI - CLI-first local workflow is sufficient for v1.2
+- Distributed optimization - local repeatable optimization is enough for v1.2
+- Portfolio analytics - v1.2 still focuses on single-strategy, single-instrument evaluation
+- Machine learning models such as Lorentzian or MLMI - keep strategy research rule-based for this milestone
 - Options or any other derivative products - MGC futures only
 - External data sources beyond the existing Databento files in `C:\dev\mgc-data` - avoid scope expansion and data inconsistency
 - Automated scheduling or task runners - manual CLI execution is the v1 workflow
@@ -85,13 +87,13 @@ v1.1 is shipped. The repo now contains a complete local MGC research platform wi
 
 The target environment is Windows 11 with PowerShell, Python 3.13.11, `uv`, and an existing virtual environment at `C:\dev\nautilustrader\.venv`. `nautilus_trader 1.225.0` is already installed and package installation should use `uv pip install`, never raw `pip`.
 
-Historical data already exists at `C:\dev\mgc-data` and includes 5 years of 1-minute OHLCV bars, trades, and instrument definitions from Databento. The strategy thesis is a trend-following pullback system using Adaptive SuperTrend plus VWAP for trend direction, WaveTrend for pullback exhaustion, and delta imbalance plus absorption plus volume plus candle formations as entry triggers, with ATR trailing stops for exits.
+Historical data already exists at `C:\dev\mgc-data` and includes 5 years of 1-minute OHLCV bars, trades, and instrument definitions from Databento. The primary strategy thesis is a trend-following pullback system using Adaptive SuperTrend plus VWAP for trend direction, WaveTrend for pullback exhaustion, and delta imbalance plus absorption plus volume plus candle formations as entry triggers, with ATR trailing stops for exits.
 
-The user does not write code and wants the entire system implemented through Codex. The project should be local-first and reusable via configuration files rather than hardcoded absolute paths, even though the immediate user is a single local Windows operator.
+The user does not write code and wants the entire system implemented through Codex. The project should remain local-first and reusable via configuration files rather than hardcoded absolute paths, even though the immediate user is a single local Windows operator.
 
 The local documentation folder `nt_docs/` is a required reference source before Nautilus-specific implementation decisions. Relevant planning and implementation should be grounded in `nt_docs/integrations/databento.md`, `nt_docs/how_to/data_catalog_databento.py`, `nt_docs/concepts/backtesting.md`, `nt_docs/getting_started/backtest_high_level.py`, `nt_docs/getting_started/backtest_low_level.py`, `nt_docs/concepts/strategies.md`, `nt_docs/api_reference/backtest.md`, and related persistence/adapter docs.
 
-This milestone is explicitly additive. The platform already has 47 passing tests, and nothing in v1.1 should regress those results. New components should continue the v1.0 project style: typed TOML config, clean module boundaries, and unit tests for every new component.
+This milestone is explicitly research-driven. Results must be reviewed after each phase before moving forward. The platform should only change when findings justify a bug fix or a strategy refinement that is itself part of the milestone.
 
 ## Constraints
 
@@ -102,10 +104,10 @@ This milestone is explicitly additive. The platform already has 47 passing tests
 - **Platform Principle**: Always use Nautilus Trader native infrastructure first - custom code must extend native facilities instead of replacing them
 - **Data Source**: Use only the existing Databento files already available locally - v1 assumes no extra downloads or alternate vendors
 - **Execution Model**: Completed 1-minute bars only for signal evaluation - keeps v1 behavior deterministic and bounded
-- **Cost Model**: Include approximately `$0.50` commission per side and `1` tick (`$0.10`) slippage per fill from day one - realism matters for trustworthy results
-- **Interface**: Small CLI with `ingest`, `backtest`, and `optimize` commands - user wants clean explicit steps without rerunning unnecessary work
-- **Outputs**: Results must include summary statistics, ranked optimization output, and saved equity-curve PNGs - these define "done" for v1
-- **Backward Compatibility**: Existing strategy behavior and the current passing test suite must remain intact - v1.1 is an extension, not a rewrite
+- **Workflow**: `uv run python -m mgc_bt ...` for all CLI runs and `uv pip install` only for packages
+- **Compatibility**: Existing 89 tests must keep passing and the MGC golden fixture must continue matching exactly
+- **Research Gate**: Stop after each phase and wait for explicit instruction before proceeding
+- **Git Discipline**: Commit and push after every phase
 
 ## Key Decisions
 
@@ -122,9 +124,10 @@ This milestone is explicitly additive. The platform already has 47 passing tests
 | Retain a shared Nautilus log guard across repeated backtest runs | Repeated in-process `BacktestNode` runs can destabilize logging on this install if the guard is dropped between runs | Phase 5 keeps the runner stable for optimization reruns and holdout execution |
 | Treat v1.1 as a research-integrity and reporting expansion, not a strategy rewrite | The user wants professional confidence tooling around the existing platform, with no change to the current strategy logic | v1.1 focuses on validation, reporting, visualization, and platform reuse layers |
 | Prioritize research correctness over visualization polish and reusability if tradeoffs arise | A beautiful tearsheet is less valuable than statistically trustworthy results | v1.1 planning should favor correct walk-forward, Monte Carlo, and holdout workflows first |
-| Generate tearsheets automatically from the existing `backtest` and `optimize` commands | Reporting should be part of the normal workflow rather than a separate manual step | v1.1 should attach tearsheet generation to existing command paths |
-| Keep walk-forward analysis inside `optimize` via a flag instead of creating a separate command | The current CLI structure should stay focused and explicit | v1.1 should extend `optimize` rather than branching the workflow surface |
-| Extract indicators into a reusable library without changing current strategy behavior | Platform reuse matters, but preserving validated strategy logic matters more | Any indicator refactor in v1.1 must be behavior-preserving |
+| Generate tearsheets automatically from the existing `backtest` and `optimize` commands | Reporting should be part of the normal workflow rather than a separate manual step | v1.1 attached tearsheet generation to existing command paths |
+| Keep walk-forward analysis inside `optimize` via a flag instead of creating a separate command | The current CLI structure should stay focused and explicit | v1.1 extended `optimize` rather than branching the workflow surface |
+| Extract indicators into a reusable library without changing current strategy behavior | Platform reuse matters, but preserving validated strategy logic matters more | v1.1 kept indicator refactors behavior-preserving |
+| Treat v1.2 as a gated research milestone instead of a straight implementation milestone | The human wants to review actual results after each phase before choosing the next step | Each v1.2 phase must stop and wait for explicit approval before proceeding |
 
 ## Evolution
 
@@ -144,4 +147,4 @@ This document evolves at phase transitions and milestone boundaries.
 4. Update Context with current state
 
 ---
-*Last updated: 2026-04-09 after v1.1 milestone*
+*Last updated: 2026-04-09 for v1.2 milestone setup*
