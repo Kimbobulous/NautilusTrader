@@ -32,6 +32,7 @@ def test_write_backtest_artifacts_creates_canonical_and_latest_outputs(tmp_path:
     assert summary_payload["parameters"]["max_daily_trades"] == 10
 
     run_config_text = artifact_paths["config_path"].read_text(encoding="utf-8")
+    assert 'native_max_order_submit_rate = "100/00:00:01"' in run_config_text
     assert 'instrument_id = "MGCJ1.GLBX"' in run_config_text
     assert 'roll_source = "explicit"' in run_config_text
     assert "max_drawdown_pct = 5.0" in run_config_text
@@ -61,7 +62,6 @@ def _sample_result() -> dict[str, object]:
             "max_daily_trades": 10,
             "max_daily_loss_dollars": 300.0,
             "max_consecutive_losses": 4,
-            "min_account_equity": 10000.0,
             "max_drawdown_pct": 5.0,
         },
         "segments": [

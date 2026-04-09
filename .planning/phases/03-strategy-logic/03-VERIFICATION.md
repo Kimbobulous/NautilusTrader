@@ -22,7 +22,8 @@ Verdict: passed.
 - [x] Trade delta uses the installed `TradeTick.aggressor_side` enum values:
   - `AggressorSide.BUYER`
   - `AggressorSide.SELLER`
-- [x] A standalone `RiskManager` enforces pre-entry and in-trade checks through the production strategy path
+- [x] Nautilus native `RiskEngineConfig` is enabled in the shared backtest engine configuration
+- [x] A standalone `RiskManager` enforces only the non-native session-level pre-entry and in-trade checks through the production strategy path
 - [x] Catalog continuity note is preserved:
   - definitions were ingested with legacy Cython decoding
   - bars/trades were ingested with `as_legacy_cython=False`
@@ -50,6 +51,6 @@ All passed.
 ## Notes
 
 - Phase 3 replaced the temporary harness strategy from Phase 2 with the real stateful MGC strategy.
-- Phase 3 now includes a dedicated standalone risk layer with its own config section and unit tests.
+- Phase 3 now includes a dedicated standalone risk layer with its own config section and unit tests, layered on top of Nautilus native `RiskEngineConfig` rather than replacing it.
 - A small reporting bug surfaced during manual smoke validation: no-trade windows could collapse the reported summary date range to a single timestamp because the account report emitted only an initial equity point. The phase now reports the resolved contract window instead.
 - The bounded smoke window produced zero trades, which is acceptable for a wiring validation because the objective was to verify production strategy execution, artifact generation, and metadata integrity rather than profitability.

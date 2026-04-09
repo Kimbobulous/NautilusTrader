@@ -28,6 +28,7 @@ def test_settings_loader_uses_expected_sections() -> None:
     assert settings.backtest.calendar_roll_business_days == 5
     assert settings.backtest.supertrend_atr_length == 10
     assert settings.backtest.min_pullback_bars == 3
+    assert settings.risk.native_max_order_submit_rate == "100/00:00:01"
     assert settings.risk.max_daily_trades == 10
     assert settings.risk.max_drawdown_pct == 5.0
 

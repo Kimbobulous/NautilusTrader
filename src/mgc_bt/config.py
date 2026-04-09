@@ -69,11 +69,13 @@ class BacktestConfig:
 
 @dataclass(frozen=True)
 class RiskConfig:
+    native_max_order_submit_rate: str
+    native_max_order_modify_rate: str
+    native_max_notional_per_order: dict[str, int]
     max_loss_per_trade_dollars: float
     max_daily_trades: int
     max_daily_loss_dollars: float
     max_consecutive_losses: int
-    min_account_equity: float
     max_drawdown_pct: float
 
 
@@ -172,11 +174,15 @@ def load_settings(config_path: str | Path) -> Settings:
             min_pullback_bars=int(_require(backtest, "min_pullback_bars", "backtest")),
         ),
         risk=RiskConfig(
+            native_max_order_submit_rate=str(_require(risk, "native_max_order_submit_rate", "risk")),
+            native_max_order_modify_rate=str(_require(risk, "native_max_order_modify_rate", "risk")),
+            native_max_notional_per_order={
+                str(key): int(value) for key, value in dict(_require(risk, "native_max_notional_per_order", "risk")).items()
+            },
             max_loss_per_trade_dollars=float(_require(risk, "max_loss_per_trade_dollars", "risk")),
             max_daily_trades=int(_require(risk, "max_daily_trades", "risk")),
             max_daily_loss_dollars=float(_require(risk, "max_daily_loss_dollars", "risk")),
             max_consecutive_losses=int(_require(risk, "max_consecutive_losses", "risk")),
-            min_account_equity=float(_require(risk, "min_account_equity", "risk")),
             max_drawdown_pct=float(_require(risk, "max_drawdown_pct", "risk")),
         ),
         optimization=OptimizationConfig(

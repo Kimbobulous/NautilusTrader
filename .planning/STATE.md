@@ -68,7 +68,7 @@ Recent decisions affecting current work:
 - Phase 2: Use `BacktestRunConfig` as the verified top-level high-level config on installed `nautilus_trader 1.225.0`
 - Phase 2: Use a venue latency model to achieve next-bar execution natively on 1-minute bars
 - Phase 3: Production strategy logic must stay event-driven, stateful, and built from pure-Python rolling indicators
-- Phase 3: Risk controls live in a standalone `RiskManager` with a dedicated `[risk]` config section and shared-runner parameter flow
+- Phase 3: Native Nautilus `RiskEngineConfig` handles framework-supported pre-trade checks, while custom risk controls stay limited to session-level logic Nautilus does not provide
 - Phase 3: Preserve the catalog decode split whenever catalog-backed assumptions matter: definitions legacy Cython, bars/trades `as_legacy_cython=False`
 
 ### Pending Todos

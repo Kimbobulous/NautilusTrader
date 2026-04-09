@@ -6,6 +6,8 @@ A local Windows-based research system for backtesting and parameter optimization
 
 This is a structured Python project for one local user, not a notebook or loose-script workflow. The implementation must follow Nautilus Trader's event-driven architecture, where strategies extend the `Strategy` class and react to engine events rather than iterating vectorized bars in a pandas-style loop.
 
+Always use `nautilus_trader`'s native infrastructure as the foundation. Extend and build on top of what `nautilus_trader` provides natively, never reimplement or work around it. When in doubt, check `nt_docs/` first to see if `nautilus_trader` already handles something before writing custom code.
+
 ## Core Value
 
 Reliable MGC data ingestion and trustworthy event-driven backtests that make optimization results credible enough to act on.

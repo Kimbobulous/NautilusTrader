@@ -4,6 +4,7 @@
 
 Completed a dedicated Phase 3 risk-management layer:
 
+- Enabled Nautilus native `RiskEngineConfig` in the shared backtest configuration path
 - Added standalone risk controls in `src/mgc_bt/backtest/risk.py`
 - Added a new `[risk]` config section in `configs/settings.toml`
 - Loaded typed risk settings in `src/mgc_bt/config.py`
@@ -13,10 +14,11 @@ Completed a dedicated Phase 3 risk-management layer:
 
 ## Key Notes
 
+- Native Nautilus infrastructure now owns built-in pre-trade validation such as instrument precision, quantity checks, and configured notional/rate limits
 - The public decision surface is centered on the two required methods:
   - `can_enter(direction, stop_distance, account_equity)`
   - `should_exit(position, current_bar, account_equity)`
-- Risk state is independent from the strategy state machine and maintains its own session counters, drawdown tracking, and loss streak logic
+- Risk state is independent from the strategy state machine and maintains only session-level counters, drawdown tracking, loss streak logic, and per-trade dollar-risk validation
 - Phase 4 can now include risk limits in the Optuna search space without reshaping the backtest architecture
 
 ## Verification

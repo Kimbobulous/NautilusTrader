@@ -91,7 +91,6 @@ def _strategy_config() -> MgcStrategyConfig:
         max_daily_trades=10,
         max_daily_loss_dollars=300.0,
         max_consecutive_losses=4,
-        min_account_equity=10000.0,
         max_drawdown_pct=5.0,
     )
 

@@ -67,7 +67,6 @@ class MgcStrategyConfig(StrategyConfig, frozen=True):
     max_daily_trades: int
     max_daily_loss_dollars: float
     max_consecutive_losses: int
-    min_account_equity: float
     max_drawdown_pct: float
 
 
@@ -97,7 +96,6 @@ class MgcSignalEngine:
             max_daily_trades=config.max_daily_trades,
             max_daily_loss_dollars=config.max_daily_loss_dollars,
             max_consecutive_losses=config.max_consecutive_losses,
-            min_account_equity=config.min_account_equity,
             max_drawdown_pct=config.max_drawdown_pct,
         )
         self._bar_index = 0

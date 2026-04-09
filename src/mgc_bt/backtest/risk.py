@@ -14,7 +14,6 @@ class RiskManager:
     max_daily_trades: int
     max_daily_loss_dollars: float
     max_consecutive_losses: int
-    min_account_equity: float
     max_drawdown_pct: float
     daily_trade_count: int = 0
     daily_pnl: float = 0.0
@@ -33,7 +32,6 @@ class RiskManager:
             max_daily_trades=config.max_daily_trades,
             max_daily_loss_dollars=config.max_daily_loss_dollars,
             max_consecutive_losses=config.max_consecutive_losses,
-            min_account_equity=config.min_account_equity,
             max_drawdown_pct=config.max_drawdown_pct,
         )
 
@@ -51,9 +49,6 @@ class RiskManager:
             return False
         if self.consecutive_losses >= self.max_consecutive_losses:
             return False
-        if account_equity < self.min_account_equity:
-            return False
-
         self.daily_trade_count += 1
         self._position_open = True
         self._entry_equity = account_equity
@@ -106,4 +101,3 @@ class RiskManager:
         self.consecutive_losses = self.consecutive_losses + 1 if trade_pnl < 0 else 0
         self._position_open = False
         self._entry_equity = None
-

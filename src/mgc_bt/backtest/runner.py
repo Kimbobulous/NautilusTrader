@@ -56,7 +56,6 @@ def run_backtest(settings: Settings, params: dict[str, Any] | None = None) -> di
         "max_daily_trades": raw_params.get("max_daily_trades", settings.risk.max_daily_trades),
         "max_daily_loss_dollars": raw_params.get("max_daily_loss_dollars", settings.risk.max_daily_loss_dollars),
         "max_consecutive_losses": raw_params.get("max_consecutive_losses", settings.risk.max_consecutive_losses),
-        "min_account_equity": raw_params.get("min_account_equity", settings.risk.min_account_equity),
         "max_drawdown_pct": raw_params.get("max_drawdown_pct", settings.risk.max_drawdown_pct),
     }
 

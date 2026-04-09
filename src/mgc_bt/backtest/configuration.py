@@ -12,6 +12,7 @@ from nautilus_trader.backtest.node import BacktestRunConfig
 from nautilus_trader.backtest.node import BacktestVenueConfig
 from nautilus_trader.common.config import LoggingConfig
 from nautilus_trader.config import ImportableStrategyConfig
+from nautilus_trader.config import RiskEngineConfig
 from nautilus_trader.model.data import Bar
 from nautilus_trader.model.data import BarType
 from nautilus_trader.model.data import TradeTick
@@ -66,7 +67,6 @@ def build_segment_run_specs(
             "max_daily_trades": int(params.get("max_daily_trades", settings.risk.max_daily_trades)),
             "max_daily_loss_dollars": float(params.get("max_daily_loss_dollars", settings.risk.max_daily_loss_dollars)),
             "max_consecutive_losses": int(params.get("max_consecutive_losses", settings.risk.max_consecutive_losses)),
-            "min_account_equity": float(params.get("min_account_equity", settings.risk.min_account_equity)),
             "max_drawdown_pct": float(params.get("max_drawdown_pct", settings.risk.max_drawdown_pct)),
         }
         specs.append(
@@ -79,6 +79,12 @@ def build_segment_run_specs(
                     ],
                     engine=BacktestEngineConfig(
                         logging=LoggingConfig(log_level="ERROR"),
+                        risk_engine=RiskEngineConfig(
+                            bypass=False,
+                            max_order_submit_rate=settings.risk.native_max_order_submit_rate,
+                            max_order_modify_rate=settings.risk.native_max_order_modify_rate,
+                            max_notional_per_order=settings.risk.native_max_notional_per_order,
+                        ),
                         strategies=[
                             ImportableStrategyConfig(
                                 # Catalog continuity reminder:

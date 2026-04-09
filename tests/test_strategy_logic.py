@@ -201,7 +201,6 @@ def _strategy_config(**overrides) -> MgcStrategyConfig:
         "max_daily_trades": 10,
         "max_daily_loss_dollars": 300.0,
         "max_consecutive_losses": 4,
-        "min_account_equity": 10000.0,
         "max_drawdown_pct": 5.0,
     }
     values.update(overrides)
@@ -227,7 +226,6 @@ def _strategy_config(**overrides) -> MgcStrategyConfig:
         max_daily_trades=values["max_daily_trades"],
         max_daily_loss_dollars=values["max_daily_loss_dollars"],
         max_consecutive_losses=values["max_consecutive_losses"],
-        min_account_equity=values["min_account_equity"],
         max_drawdown_pct=values["max_drawdown_pct"],
     )
 

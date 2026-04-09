@@ -51,11 +51,13 @@ atr_trail_multiplier = 2.0
 min_pullback_bars = 3
 
 [risk]
+native_max_order_submit_rate = "100/00:00:01"
+native_max_order_modify_rate = "100/00:00:01"
+native_max_notional_per_order = {}
 max_loss_per_trade_dollars = 150.0
 max_daily_trades = 10
 max_daily_loss_dollars = 300.0
 max_consecutive_losses = 4
-min_account_equity = 10000.0
 max_drawdown_pct = 5.0
 
 [optimization]

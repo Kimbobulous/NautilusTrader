@@ -109,11 +109,13 @@ def _render_run_config_toml(settings: Settings, result: dict[str, Any]) -> str:
         f"slippage_ticks = {settings.backtest.slippage_ticks}",
         "",
         "[risk]",
+        f'native_max_order_submit_rate = "{settings.risk.native_max_order_submit_rate}"',
+        f'native_max_order_modify_rate = "{settings.risk.native_max_order_modify_rate}"',
+        f"native_max_notional_per_order = {_render_notional_table(settings.risk.native_max_notional_per_order)}",
         f"max_loss_per_trade_dollars = {params['max_loss_per_trade_dollars']}",
         f"max_daily_trades = {params['max_daily_trades']}",
         f"max_daily_loss_dollars = {params['max_daily_loss_dollars']}",
         f"max_consecutive_losses = {params['max_consecutive_losses']}",
-        f"min_account_equity = {params['min_account_equity']}",
         f"max_drawdown_pct = {params['max_drawdown_pct']}",
         "",
         "[optimization]",
@@ -130,3 +132,10 @@ def _render_run_config_toml(settings: Settings, result: dict[str, Any]) -> str:
 
 def _toml_bool(value: bool) -> str:
     return "true" if value else "false"
+
+
+def _render_notional_table(values: dict[str, int]) -> str:
+    if not values:
+        return "{}"
+    inner = ", ".join(f'"{key}" = {value}' for key, value in sorted(values.items()))
+    return "{ " + inner + " }"

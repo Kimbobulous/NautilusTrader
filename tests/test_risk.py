@@ -50,15 +50,6 @@ def test_can_enter_rejects_when_consecutive_losses_limit_is_hit() -> None:
     assert not allowed
 
 
-def test_can_enter_rejects_when_account_equity_is_too_low() -> None:
-    risk = _risk(min_account_equity=49_500.0)
-    risk._sync_session(_ts(0), 49_000.0)
-
-    allowed = risk.can_enter(TradeDirection.LONG, stop_distance=2.0, account_equity=49_000.0)
-
-    assert not allowed
-
-
 def test_should_exit_halts_trading_when_drawdown_limit_is_breached() -> None:
     risk = _risk(max_drawdown_pct=5.0)
     risk._sync_session(_ts(0), 50_000.0)
@@ -100,7 +91,6 @@ def _risk(**overrides) -> RiskManager:
         "max_daily_trades": 10,
         "max_daily_loss_dollars": 300.0,
         "max_consecutive_losses": 4,
-        "min_account_equity": 10_000.0,
         "max_drawdown_pct": 5.0,
     }
     values.update(overrides)
