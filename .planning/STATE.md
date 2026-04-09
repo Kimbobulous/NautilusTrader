@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: ready_to_discuss
-stopped_at: Phase 8 executed
-last_updated: "2026-04-09T21:45:00.000Z"
-last_activity: 2026-04-09 -- Phase 08 execution complete
+status: ready_to_plan
+stopped_at: Phase 9 context gathered
+last_updated: "2026-04-09T22:20:00.000Z"
+last_activity: 2026-04-09 -- Phase 09 context captured
 progress:
   total_phases: 4
   completed_phases: 3
@@ -26,9 +26,9 @@ See: .planning/PROJECT.md (updated 2026-04-08)
 ## Current Position
 
 Phase: 9 - Reusable Strategy Platform
-Plan: awaiting discussion
-Status: Ready to discuss
-Last activity: 2026-04-09 -- Phase 08 execution complete
+Plan: context captured
+Status: Ready to plan
+Last activity: 2026-04-09 -- Phase 09 context captured
 
 Progress: [########--] 75%
 
@@ -52,7 +52,7 @@ Progress: [########--] 75%
 **Recent Trend:**
 
 - Last 5 plans: 07-04, 08-01, 08-02, 08-03, 08-04 completed
-- Trend: Phase 8 shipped cleanly; Phase 9 is unblocked
+- Trend: Phase 9 context is locked and planning is unblocked
 
 ## Accumulated Context
 
@@ -84,6 +84,9 @@ Recent decisions affecting current work:
 - Phase 8: Tearsheets must be self-contained `tearsheet.html` files generated automatically and added to the run manifest
 - Phase 8: Missing section inputs should render explicit section-level notices instead of silently dropping content
 - Phase 8: Plotly should be embedded exactly once per tearsheet document to keep file size practical
+- Phase 9: Strategy reuse must preserve current MGC behavior exactly; refactor only, no signal changes
+- Phase 9: Strategy selection should default to a named registry with optional import-path override
+- Phase 9: Comparison should be a dedicated CLI command with two normal run folders plus a lightweight comparison folder
 
 ### Pending Todos
 
@@ -104,6 +107,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-09 21:45
-Stopped at: Phase 8 execution complete
-Resume file: .planning/ROADMAP.md
+Last session: 2026-04-09 22:20
+Stopped at: Phase 9 context gathered
+Resume file: .planning/phases/09-reusable-strategy-platform/09-CONTEXT.md
