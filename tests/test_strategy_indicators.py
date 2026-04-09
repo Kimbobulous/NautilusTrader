@@ -87,6 +87,12 @@ def _strategy_config() -> MgcStrategyConfig:
         atr_trail_length=5,
         atr_trail_multiplier=2.0,
         min_pullback_bars=3,
+        max_loss_per_trade_dollars=150.0,
+        max_daily_trades=10,
+        max_daily_loss_dollars=300.0,
+        max_consecutive_losses=4,
+        min_account_equity=10000.0,
+        max_drawdown_pct=5.0,
     )
 
 

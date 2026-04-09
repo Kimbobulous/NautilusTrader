@@ -68,6 +68,16 @@ class BacktestConfig:
 
 
 @dataclass(frozen=True)
+class RiskConfig:
+    max_loss_per_trade_dollars: float
+    max_daily_trades: int
+    max_daily_loss_dollars: float
+    max_consecutive_losses: int
+    min_account_equity: float
+    max_drawdown_pct: float
+
+
+@dataclass(frozen=True)
 class OptimizationConfig:
     study_name: str
     direction: str
@@ -79,6 +89,7 @@ class Settings:
     paths: PathsConfig
     ingestion: IngestionConfig
     backtest: BacktestConfig
+    risk: RiskConfig
     optimization: OptimizationConfig
 
 
@@ -90,7 +101,7 @@ def load_settings(config_path: str | Path) -> Settings:
     with path.open("rb") as handle:
         raw = tomllib.load(handle)
 
-    for section in ("paths", "ingestion", "backtest", "optimization"):
+    for section in ("paths", "ingestion", "backtest", "risk", "optimization"):
         if section not in raw:
             raise ConfigError(f"Missing required config section: [{section}]")
 
@@ -103,6 +114,7 @@ def load_settings(config_path: str | Path) -> Settings:
 
     ingestion = raw["ingestion"]
     backtest = raw["backtest"]
+    risk = raw["risk"]
     optimization = raw["optimization"]
 
     return Settings(
@@ -158,6 +170,14 @@ def load_settings(config_path: str | Path) -> Settings:
             atr_trail_length=int(_require(backtest, "atr_trail_length", "backtest")),
             atr_trail_multiplier=float(_require(backtest, "atr_trail_multiplier", "backtest")),
             min_pullback_bars=int(_require(backtest, "min_pullback_bars", "backtest")),
+        ),
+        risk=RiskConfig(
+            max_loss_per_trade_dollars=float(_require(risk, "max_loss_per_trade_dollars", "risk")),
+            max_daily_trades=int(_require(risk, "max_daily_trades", "risk")),
+            max_daily_loss_dollars=float(_require(risk, "max_daily_loss_dollars", "risk")),
+            max_consecutive_losses=int(_require(risk, "max_consecutive_losses", "risk")),
+            min_account_equity=float(_require(risk, "min_account_equity", "risk")),
+            max_drawdown_pct=float(_require(risk, "max_drawdown_pct", "risk")),
         ),
         optimization=OptimizationConfig(
             study_name=str(_require(optimization, "study_name", "optimization")),

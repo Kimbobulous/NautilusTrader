@@ -24,6 +24,7 @@ from mgc_bt.backtest.indicators import FractalPivotTracker
 from mgc_bt.backtest.indicators import RollingMeanIndicator
 from mgc_bt.backtest.indicators import SessionVwapIndicator
 from mgc_bt.backtest.indicators import WaveTrendIndicator
+from mgc_bt.backtest.risk import RiskManager
 from mgc_bt.backtest.state import BarSnapshot
 from mgc_bt.backtest.state import PendingInsideBar
 from mgc_bt.backtest.state import StrategyDecision
@@ -62,6 +63,12 @@ class MgcStrategyConfig(StrategyConfig, frozen=True):
     atr_trail_length: int
     atr_trail_multiplier: float
     min_pullback_bars: int
+    max_loss_per_trade_dollars: float
+    max_daily_trades: int
+    max_daily_loss_dollars: float
+    max_consecutive_losses: int
+    min_account_equity: float
+    max_drawdown_pct: float
 
 
 class MgcSignalEngine:
@@ -85,6 +92,14 @@ class MgcSignalEngine:
         self.range_mean = RollingMeanIndicator(config.volume_lookback)
         self.swing_highs = FractalPivotTracker("high")
         self.swing_lows = FractalPivotTracker("low")
+        self.risk = RiskManager(
+            max_loss_per_trade_dollars=config.max_loss_per_trade_dollars,
+            max_daily_trades=config.max_daily_trades,
+            max_daily_loss_dollars=config.max_daily_loss_dollars,
+            max_consecutive_losses=config.max_consecutive_losses,
+            min_account_equity=config.min_account_equity,
+            max_drawdown_pct=config.max_drawdown_pct,
+        )
         self._bar_index = 0
         self._recent_bars: deque[BarSnapshot] = deque(maxlen=PINBAR_LOOKBACK + 3)
         self._bar_deltas: dict[int, float] = {}
@@ -110,8 +125,10 @@ class MgcSignalEngine:
         elif tick.aggressor_side == AggressorSide.SELLER:
             self._trade_buckets[bucket]["sell"] += size
 
-    def on_bar(self, bar: Bar) -> StrategyDecision:
+    def on_bar(self, bar: Bar, account_equity: float | None = None) -> StrategyDecision:
         snapshot = self._to_snapshot(bar)
+        if account_equity is not None:
+            self.risk._sync_session(snapshot.ts_event_ns, account_equity)
         bucket = self._minute_bucket(snapshot.ts_event_ns)
         bucket_data = self._trade_buckets.pop(bucket, {"buy": 0.0, "sell": 0.0})
         delta_value = bucket_data["buy"] - bucket_data["sell"]
@@ -138,9 +155,18 @@ class MgcSignalEngine:
         decision = StrategyDecision()
 
         if self.state.position_open and atr_value is not None:
-            decision = self._manage_open_trade(snapshot, trend_direction, atr_value)
+            decision = self._manage_open_trade(snapshot, trend_direction, atr_value, account_equity)
         elif not self.state.entry_pending and not self.state.exit_pending and self.is_ready:
-            decision = self._evaluate_setup(snapshot, trend_direction, delta_value, prior_volume_avg, prior_range_avg, candle_confirmation)
+            decision = self._evaluate_setup(
+                snapshot,
+                trend_direction,
+                delta_value,
+                prior_volume_avg,
+                prior_range_avg,
+                candle_confirmation,
+                atr_value,
+                account_equity,
+            )
 
         self._update_inside_bar_state(snapshot)
         self._recent_bars.append(snapshot)
@@ -184,6 +210,8 @@ class MgcSignalEngine:
         prior_volume_avg: float | None,
         prior_range_avg: float | None,
         candle_confirmation: CandleConfirmation,
+        atr_value: float | None,
+        account_equity: float | None,
     ) -> StrategyDecision:
         if trend_direction is None:
             self.state.phase = StrategyPhase.FLAT
@@ -209,6 +237,11 @@ class MgcSignalEngine:
         ):
             return StrategyDecision()
 
+        if account_equity is not None and atr_value is not None:
+            stop_distance = atr_value * self.config.atr_trail_multiplier
+            if not self.risk.can_enter(trend_direction, stop_distance, account_equity):
+                return StrategyDecision()
+
         return StrategyDecision(
             enter_direction=trend_direction,
             reason=f"entry:{trend_direction.value.lower()}",
@@ -219,9 +252,13 @@ class MgcSignalEngine:
         snapshot: BarSnapshot,
         trend_direction: TradeDirection | None,
         atr_value: float,
+        account_equity: float | None,
     ) -> StrategyDecision:
         if self.state.exit_pending or self.state.position_direction is None:
             return StrategyDecision()
+
+        if account_equity is not None and self.risk.should_exit(self.state, snapshot, account_equity):
+            return StrategyDecision(exit_trade=True, reason="risk_halt")
 
         if self.state.position_direction == TradeDirection.LONG:
             self.state.highest_close_since_entry = max(self.state.highest_close_since_entry or snapshot.close, snapshot.close)
@@ -404,7 +441,7 @@ class MgcProductionStrategy(Strategy):
         self._engine.on_trade_tick(tick)
 
     def on_bar(self, bar: Bar) -> None:
-        decision = self._engine.on_bar(bar)
+        decision = self._engine.on_bar(bar, account_equity=self._current_account_equity())
         if not decision.has_action:
             return
         if decision.exit_trade and self._engine.state.position_open and not self._engine.state.exit_pending:
@@ -436,3 +473,15 @@ class MgcProductionStrategy(Strategy):
 
     def on_stop(self) -> None:
         self.close_all_positions(self.config.instrument_id)
+
+    def _current_account_equity(self) -> float | None:
+        account = self.portfolio.account(venue=self.config.instrument_id.venue)
+        if account is None:
+            account = self.cache.account_for_venue(venue=self.config.instrument_id.venue)
+        if account is None:
+            return None
+
+        balance_total = account.balance_total()
+        if balance_total is None:
+            return None
+        return float(balance_total.as_double())

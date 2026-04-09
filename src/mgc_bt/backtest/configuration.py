@@ -62,6 +62,12 @@ def build_segment_run_specs(
             "atr_trail_length": int(params.get("atr_trail_length", settings.backtest.atr_trail_length)),
             "atr_trail_multiplier": float(params.get("atr_trail_multiplier", settings.backtest.atr_trail_multiplier)),
             "min_pullback_bars": int(params.get("min_pullback_bars", settings.backtest.min_pullback_bars)),
+            "max_loss_per_trade_dollars": float(params.get("max_loss_per_trade_dollars", settings.risk.max_loss_per_trade_dollars)),
+            "max_daily_trades": int(params.get("max_daily_trades", settings.risk.max_daily_trades)),
+            "max_daily_loss_dollars": float(params.get("max_daily_loss_dollars", settings.risk.max_daily_loss_dollars)),
+            "max_consecutive_losses": int(params.get("max_consecutive_losses", settings.risk.max_consecutive_losses)),
+            "min_account_equity": float(params.get("min_account_equity", settings.risk.min_account_equity)),
+            "max_drawdown_pct": float(params.get("max_drawdown_pct", settings.risk.max_drawdown_pct)),
         }
         specs.append(
             SegmentRunSpec(

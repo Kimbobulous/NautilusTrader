@@ -59,13 +59,14 @@ Plans:
   2. Trend, pullback, entry trigger, and ATR trailing-stop logic all run inside the event-driven backtest workflow.
   3. Signals are evaluated on completed 1-minute bars only, matching the scoped v1 realism.
   4. The implementation remains purely rule-based with no machine-learning training path.
-**Plans**: 4 plans
+**Plans**: 5 plans
 
 Plans:
 - [x] 03-01: Implement strategy config and internal indicator/state model
 - [x] 03-02: Implement trend and pullback qualification logic
 - [x] 03-03: Implement entry-trigger confirmation logic
 - [x] 03-04: Implement ATR trailing-stop exits and strategy reporting hooks
+- [x] 03-05: Add a standalone risk-management layer and wire it into the production strategy
 
 ### Phase 4: Optimization Workflow
 **Goal**: Deliver a repeatable Optuna workflow that tests parameter combinations, ranks results, and saves best-run artifacts.
@@ -76,6 +77,7 @@ Plans:
   2. Each trial records parameters and key metrics including Sharpe, PnL, win rate, max drawdown, and trade count.
   3. Optimization outputs include a ranked parameter table saved to the results directory.
   4. The best parameter set produces a saved equity curve PNG and reproducible artifact bundle.
+  5. The Optuna search space can vary both strategy parameters and the persisted `[risk]` limits without changing the runner architecture.
 **Plans**: 3 plans
 
 Plans:
@@ -107,6 +109,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. Catalog Foundation | 3/3 | Complete    | 2026-04-08 |
 | 2. Backtest Runner | 3/3 | Complete    | 2026-04-08 |
-| 3. Strategy Logic | 4/4 | Complete    | 2026-04-09 |
+| 3. Strategy Logic | 5/5 | Complete    | 2026-04-09 |
 | 4. Optimization Workflow | 0/3 | Not started | - |
 | 5. Validation and Hardening | 0/3 | Not started | - |

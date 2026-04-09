@@ -125,6 +125,41 @@ def test_end_to_end_state_machine_sequence() -> None:
     assert exit_decision.exit_trade
 
 
+def test_risk_manager_blocks_entry_when_trade_risk_is_too_large() -> None:
+    engine = MgcSignalEngine(_strategy_config(max_loss_per_trade_dollars=10.0))
+    _prime_ready_state(engine, supertrend_direction=-1, vwap_value=99.0, atr_value=10.0)
+    engine.state.last_confirmed_swing_low = ConfirmedPivot(index=190, value=98.0)
+
+    for _ in range(60):
+        engine.on_trade_tick(_trade_tick(AggressorSide.BUYER, 2.0, _bar_ts(201)))
+
+    decision = engine.on_bar(
+        _bar(open_=100.0, high=105.0, low=99.5, close=104.9, volume=115.0, index=201),
+        account_equity=50_000.0,
+    )
+    assert not decision.has_action
+
+
+def test_risk_manager_forces_exit_when_drawdown_limit_is_hit() -> None:
+    engine = MgcSignalEngine(_strategy_config(max_drawdown_pct=5.0))
+    _prime_ready_state(engine, supertrend_direction=-1, vwap_value=99.0, atr_value=1.0)
+    engine.risk._sync_session(_bar_ts(200), 50_000.0)
+    engine.risk.can_enter(TradeDirection.LONG, 2.0, 50_000.0)
+    engine.state.position_open = True
+    engine.state.phase = StrategyPhase.IN_TRADE
+    engine.state.position_direction = TradeDirection.LONG
+    engine.state.highest_close_since_entry = 110.0
+    engine.state.current_trailing_stop = 80.0
+
+    decision = engine.on_bar(
+        _bar(open_=100.0, high=101.0, low=99.0, close=100.0, volume=100.0, index=201),
+        account_equity=47_000.0,
+    )
+
+    assert decision.exit_trade
+    assert engine.risk.trading_halted_for_session
+
+
 def _prime_ready_state(
     engine: MgcSignalEngine,
     *,
@@ -143,25 +178,57 @@ def _prime_ready_state(
     engine.swing_lows = _StubPivot()
 
 
-def _strategy_config() -> MgcStrategyConfig:
+def _strategy_config(**overrides) -> MgcStrategyConfig:
+    values = {
+        "instrument_id": InstrumentId.from_str("MGCJ1.GLBX"),
+        "bar_type": BarType.from_str("MGCJ1.GLBX-1-MINUTE-LAST-EXTERNAL"),
+        "trade_size": Decimal("1"),
+        "supertrend_atr_length": 10,
+        "supertrend_factor": 3.0,
+        "supertrend_training_period": 100,
+        "vwap_reset_hour_utc": 0,
+        "wavetrend_n1": 10,
+        "wavetrend_n2": 21,
+        "wavetrend_ob_level": 2.0,
+        "delta_imbalance_threshold": 0.3,
+        "absorption_volume_multiplier": 1.5,
+        "absorption_range_multiplier": 0.7,
+        "volume_lookback": 20,
+        "atr_trail_length": 14,
+        "atr_trail_multiplier": 2.0,
+        "min_pullback_bars": 3,
+        "max_loss_per_trade_dollars": 150.0,
+        "max_daily_trades": 10,
+        "max_daily_loss_dollars": 300.0,
+        "max_consecutive_losses": 4,
+        "min_account_equity": 10000.0,
+        "max_drawdown_pct": 5.0,
+    }
+    values.update(overrides)
     return MgcStrategyConfig(
-        instrument_id=InstrumentId.from_str("MGCJ1.GLBX"),
-        bar_type=BarType.from_str("MGCJ1.GLBX-1-MINUTE-LAST-EXTERNAL"),
-        trade_size=Decimal("1"),
-        supertrend_atr_length=10,
-        supertrend_factor=3.0,
-        supertrend_training_period=100,
-        vwap_reset_hour_utc=0,
-        wavetrend_n1=10,
-        wavetrend_n2=21,
-        wavetrend_ob_level=2.0,
-        delta_imbalance_threshold=0.3,
-        absorption_volume_multiplier=1.5,
-        absorption_range_multiplier=0.7,
-        volume_lookback=20,
-        atr_trail_length=14,
-        atr_trail_multiplier=2.0,
-        min_pullback_bars=3,
+        instrument_id=values["instrument_id"],
+        bar_type=values["bar_type"],
+        trade_size=values["trade_size"],
+        supertrend_atr_length=values["supertrend_atr_length"],
+        supertrend_factor=values["supertrend_factor"],
+        supertrend_training_period=values["supertrend_training_period"],
+        vwap_reset_hour_utc=values["vwap_reset_hour_utc"],
+        wavetrend_n1=values["wavetrend_n1"],
+        wavetrend_n2=values["wavetrend_n2"],
+        wavetrend_ob_level=values["wavetrend_ob_level"],
+        delta_imbalance_threshold=values["delta_imbalance_threshold"],
+        absorption_volume_multiplier=values["absorption_volume_multiplier"],
+        absorption_range_multiplier=values["absorption_range_multiplier"],
+        volume_lookback=values["volume_lookback"],
+        atr_trail_length=values["atr_trail_length"],
+        atr_trail_multiplier=values["atr_trail_multiplier"],
+        min_pullback_bars=values["min_pullback_bars"],
+        max_loss_per_trade_dollars=values["max_loss_per_trade_dollars"],
+        max_daily_trades=values["max_daily_trades"],
+        max_daily_loss_dollars=values["max_daily_loss_dollars"],
+        max_consecutive_losses=values["max_consecutive_losses"],
+        min_account_equity=values["min_account_equity"],
+        max_drawdown_pct=values["max_drawdown_pct"],
     )
 
 

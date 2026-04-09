@@ -30,6 +30,7 @@ def test_run_backtest_returns_structured_summary() -> None:
     assert isinstance(result["equity_curve"], list)
     assert result["parameters"]["instrument_id"] == "MGCJ1.GLBX"
     assert result["parameters"]["supertrend_atr_length"] == settings.backtest.supertrend_atr_length
+    assert result["parameters"]["max_daily_trades"] == settings.risk.max_daily_trades
     assert result["start_date"] == "2021-03-08T00:00:00+00:00"
     assert result["end_date"] == "2021-03-08T06:00:00+00:00"
 

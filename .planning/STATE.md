@@ -9,9 +9,9 @@ last_activity: 2026-04-09 - Phase 3 completed, ready to discuss Phase 4
 progress:
   total_phases: 5
   completed_phases: 3
-  total_plans: 16
-  completed_plans: 10
-  percent: 62
+  total_plans: 17
+  completed_plans: 11
+  percent: 65
 ---
 
 # Project State
@@ -36,7 +36,7 @@ Progress: [######----] 62%
 
 **Velocity:**
 
-- Total plans completed: 10
+- Total plans completed: 11
 - Average duration: 0 min
 - Total execution time: 0.0 hours
 
@@ -46,11 +46,11 @@ Progress: [######----] 62%
 |-------|-------|-------|----------|
 | 1 | 3 | - | - |
 | 2 | 3 | - | - |
-| 3 | 4 | - | - |
+| 3 | 5 | - | - |
 
 **Recent Trend:**
 
-- Last 5 plans: 03-01, 03-02, 03-03, 03-04
+- Last 5 plans: 03-01, 03-02, 03-03, 03-04, 03-05
 - Trend: Advancing
 
 ## Accumulated Context
@@ -68,6 +68,7 @@ Recent decisions affecting current work:
 - Phase 2: Use `BacktestRunConfig` as the verified top-level high-level config on installed `nautilus_trader 1.225.0`
 - Phase 2: Use a venue latency model to achieve next-bar execution natively on 1-minute bars
 - Phase 3: Production strategy logic must stay event-driven, stateful, and built from pure-Python rolling indicators
+- Phase 3: Risk controls live in a standalone `RiskManager` with a dedicated `[risk]` config section and shared-runner parameter flow
 - Phase 3: Preserve the catalog decode split whenever catalog-backed assumptions matter: definitions legacy Cython, bars/trades `as_legacy_cython=False`
 
 ### Pending Todos
@@ -78,6 +79,7 @@ None yet.
 
 - Nautilus-specific implementation should continue to reference `nt_docs/` for adapter/backtest details
 - Phase 4 should keep using the shared `run_backtest(settings, params) -> dict` core rather than subprocess orchestration
+- Phase 4 should include the new risk parameters in the Optuna search space alongside strategy parameters
 - Future catalog-touching work must preserve the decode split:
   - definitions use legacy Cython decoding
   - bars/trades use `as_legacy_cython=False`
