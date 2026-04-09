@@ -9,6 +9,26 @@ class ConfigError(ValueError):
     """Raised when the project configuration is invalid."""
 
 
+DEFAULT_WALK_FORWARD = {
+    "train_months": 12,
+    "validation_months": 3,
+    "test_months": 3,
+    "step_months": 3,
+    "validation_top_n": 5,
+    "min_training_bars": 50_000,
+    "min_test_trades": 10,
+    "final_test_months": 6,
+    "runtime_warning_minutes": 30,
+}
+
+DEFAULT_MONTE_CARLO = {
+    "simulations": 1_000,
+    "confidence_level": 0.95,
+    "percentile_points": (5, 25, 50, 75, 95),
+    "random_seed_offset": 10_000,
+}
+
+
 @dataclass(frozen=True)
 class PathsConfig:
     project_root: Path
@@ -140,7 +160,7 @@ def load_settings(config_path: str | Path) -> Settings:
     except tomllib.TOMLDecodeError as exc:
         raise ConfigError(f"Config file is not valid TOML: {exc}") from exc
 
-    for section in ("paths", "ingestion", "backtest", "risk", "optimization", "walk_forward", "monte_carlo"):
+    for section in ("paths", "ingestion", "backtest", "risk", "optimization"):
         if section not in raw:
             raise ConfigError(f"Missing required config section: [{section}]")
 
@@ -155,8 +175,10 @@ def load_settings(config_path: str | Path) -> Settings:
     backtest = raw["backtest"]
     risk = raw["risk"]
     optimization = raw["optimization"]
-    walk_forward = raw["walk_forward"]
-    monte_carlo = raw["monte_carlo"]
+    walk_forward = dict(DEFAULT_WALK_FORWARD)
+    walk_forward.update(raw.get("walk_forward", {}))
+    monte_carlo = dict(DEFAULT_MONTE_CARLO)
+    monte_carlo.update(raw.get("monte_carlo", {}))
 
     settings = Settings(
         config_path=path,
