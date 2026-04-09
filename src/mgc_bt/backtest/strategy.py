@@ -151,10 +151,11 @@ class MgcSignalEngine:
         snapshot = self._to_snapshot(bar)
         if account_equity is not None:
             self.risk._sync_session(snapshot.ts_event_ns, account_equity)
-        bucket = self._minute_bucket(snapshot.ts_event_ns)
-        bucket_data = self._trade_buckets.pop(bucket, {"buy": 0.0, "sell": 0.0})
+        current_bucket = self._minute_bucket(snapshot.ts_event_ns)
+        completed_bucket = current_bucket - 1
+        bucket_data = self._trade_buckets.pop(completed_bucket, {"buy": 0.0, "sell": 0.0})
         delta_value = bucket_data["buy"] - bucket_data["sell"]
-        self._bar_deltas[bucket] = delta_value
+        self._bar_deltas[completed_bucket] = delta_value
 
         prior_volume_avg = self.volume_mean.value
         prior_range_avg = self.range_mean.value

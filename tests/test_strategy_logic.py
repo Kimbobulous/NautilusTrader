@@ -53,13 +53,13 @@ def test_entry_requires_optional_confirmation() -> None:
     engine.state.last_confirmed_swing_low = ConfirmedPivot(index=190, value=98.0)
 
     for _ in range(60):
-        engine.on_trade_tick(_trade_tick(AggressorSide.BUYER, 2.0, _bar_ts(200)))
+        engine.on_trade_tick(_trade_tick(AggressorSide.BUYER, 2.0, _bar_ts(199)))
 
     no_optional = engine.on_bar(_bar(open_=100.0, high=101.0, low=99.0, close=100.4, volume=110.0, index=200))
     assert not no_optional.has_action
 
     for _ in range(60):
-        engine.on_trade_tick(_trade_tick(AggressorSide.BUYER, 2.0, _bar_ts(201)))
+        engine.on_trade_tick(_trade_tick(AggressorSide.BUYER, 2.0, _bar_ts(200)))
 
     with_optional = engine.on_bar(_bar(open_=100.0, high=105.0, low=99.5, close=104.9, volume=115.0, index=201))
     assert with_optional.enter_direction == TradeDirection.LONG
@@ -71,13 +71,13 @@ def test_delta_uses_buyer_and_seller_enum_names() -> None:
     engine.state.last_confirmed_swing_low = ConfirmedPivot(index=190, value=98.0)
 
     for _ in range(10):
-        engine.on_trade_tick(_trade_tick(AggressorSide.BUYER, 3.0, _bar_ts(200)))
+        engine.on_trade_tick(_trade_tick(AggressorSide.BUYER, 3.0, _bar_ts(199)))
     for _ in range(5):
-        engine.on_trade_tick(_trade_tick(AggressorSide.SELLER, 1.0, _bar_ts(200)))
+        engine.on_trade_tick(_trade_tick(AggressorSide.SELLER, 1.0, _bar_ts(199)))
 
     bar = _bar(open_=100.0, high=104.0, low=99.0, close=103.9, volume=50.0, index=200)
     engine.on_bar(bar)
-    bucket = bar.ts_event // 60_000_000_000
+    bucket = (bar.ts_event // 60_000_000_000) - 1
     assert engine._bar_deltas[bucket] == 25.0
 
 
@@ -109,7 +109,7 @@ def test_end_to_end_state_machine_sequence() -> None:
     assert engine.state.phase == StrategyPhase.PULLBACK_ARMED
 
     for _ in range(60):
-        engine.on_trade_tick(_trade_tick(AggressorSide.BUYER, 2.0, _bar_ts(201)))
+        engine.on_trade_tick(_trade_tick(AggressorSide.BUYER, 2.0, _bar_ts(200)))
     entry = engine.on_bar(_bar(open_=100.0, high=105.0, low=99.5, close=104.9, volume=115.0, index=201))
     assert entry.enter_direction == TradeDirection.LONG
     engine.entry_submitted(TradeDirection.LONG)
@@ -131,7 +131,7 @@ def test_risk_manager_blocks_entry_when_trade_risk_is_too_large() -> None:
     engine.state.last_confirmed_swing_low = ConfirmedPivot(index=190, value=98.0)
 
     for _ in range(60):
-        engine.on_trade_tick(_trade_tick(AggressorSide.BUYER, 2.0, _bar_ts(201)))
+        engine.on_trade_tick(_trade_tick(AggressorSide.BUYER, 2.0, _bar_ts(200)))
 
     decision = engine.on_bar(
         _bar(open_=100.0, high=105.0, low=99.5, close=104.9, volume=115.0, index=201),

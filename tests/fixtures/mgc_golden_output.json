@@ -1,13 +1,14 @@
 {
   "instrument_id": "MGCJ1.GLBX",
   "start_date": "2021-03-09T00:00:00+00:00",
-  "end_date": "2021-03-10T23:59:00+00:00",
-  "source_summary_path": "results/backtests/2026-04-09_171018/summary.json",
-  "captured_at": "2026-04-09T17:10:18",
+  "end_date": "2021-06-30T23:59:00+00:00",
+  "effective_end_date": "2021-04-27T15:31:00+00:00",
+  "source_summary_path": "results/backtests/2026-04-09_174823/summary.json",
+  "captured_at": "2026-04-09T17:48:23",
   "metrics": {
-    "total_pnl": 0.0,
-    "total_trades": 0,
-    "win_rate": 0.0,
-    "max_drawdown": 0.0
+    "total_pnl": -33.0,
+    "total_trades": 14,
+    "win_rate": 28.5714,
+    "max_drawdown": 36.5
   }
 }
