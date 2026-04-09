@@ -54,36 +54,38 @@ Phase 7 adds explainability and analysis on top of the shipped backtest and opti
 - **D-05:** The audit artifact is saved as `analytics/audit_log.csv` alongside every backtest result.
 - **D-06:** The audit log is the most important Phase 7 analytics artifact because it explains why trades were taken or rejected.
 - **D-07:** Because five-year runs will generate large audit files, implementation must use efficient streaming CSV writing rather than building a huge in-memory dataframe for `pandas.to_csv`.
+- **D-08:** The audit log writer must use Python's built-in `csv.writer` in append mode and write one row at a time as each relevant bar or trade event is processed.
+- **D-09:** The audit log file handle must be opened once at strategy start and closed at strategy stop; audit rows must not be buffered in a giant in-memory list for end-of-run writing.
 
 ### Performance breakdown definitions
-- **D-08:** Phase 7 must compute performance breakdowns for:
+- **D-10:** Phase 7 must compute performance breakdowns for:
   - session
   - volatility regime
   - month
   - year
   - day of week
   - hour of day (UTC)
-- **D-09:** Session buckets are locked as:
+- **D-11:** Session buckets are locked as:
   - `rth`: `13:30-20:00 UTC`
   - `asian`: `00:00-07:00 UTC`
   - `london`: `07:00-13:30 UTC`
   - `globex_overnight`: `20:00-24:00 UTC`
-- **D-10:** Volatility regime uses the Adaptive SuperTrend volatility cluster at trade entry:
+- **D-12:** Volatility regime uses the Adaptive SuperTrend volatility cluster at trade entry:
   - `1 = low`
   - `2 = medium`
   - `3 = high`
-- **D-11:** Each breakdown category must compute:
+- **D-13:** Each breakdown category must compute:
   - `trade_count`
   - `win_rate`
   - `total_pnl`
   - `average_pnl_per_trade`
   - `sharpe_ratio`
   - `max_drawdown`
-- **D-12:** Each breakdown is saved as its own CSV under `analytics/breakdowns/`.
+- **D-14:** Each breakdown is saved as its own CSV under `analytics/breakdowns/`.
 
 ### Drawdown analysis contract
-- **D-13:** Phase 7 must compute and persist drawdown episodes as continuous periods where equity remains below its prior peak.
-- **D-14:** Each drawdown episode row must include:
+- **D-15:** Phase 7 must compute and persist drawdown episodes as continuous periods where equity remains below its prior peak.
+- **D-16:** Each drawdown episode row must include:
   - `episode_start`
   - `episode_end`
   - `episode_duration_bars`
@@ -95,7 +97,7 @@ Phase 7 adds explainability and analysis on top of the shipped backtest and opti
   - `recovery_duration_bars`
   - `recovery_duration_days`
   - `recovered`
-- **D-15:** Phase 7 must also compute and persist the summary drawdown metrics:
+- **D-17:** Phase 7 must also compute and persist the summary drawdown metrics:
   - `max_drawdown_pct`
   - `max_drawdown_dollars`
   - `avg_drawdown_pct`
@@ -106,26 +108,26 @@ Phase 7 adds explainability and analysis on top of the shipped backtest and opti
   - `avg_recovery_duration_days`
   - `total_drawdown_episodes`
   - `pct_time_in_drawdown`
-- **D-16:** Episode detail is saved to `analytics/drawdown_episodes.csv`.
-- **D-17:** Underwater equity time series is saved to `analytics/underwater_curve.csv`.
-- **D-18:** Summary drawdown metrics are added into the existing `summary.json` rather than split into a separate summary file.
+- **D-18:** Episode detail is saved to `analytics/drawdown_episodes.csv`.
+- **D-19:** Underwater equity time series is saved to `analytics/underwater_curve.csv`.
+- **D-20:** Summary drawdown metrics are added into the existing `summary.json` rather than split into a separate summary file.
 
 ### Parameter sensitivity methodology
-- **D-19:** Parameter sensitivity must reuse existing optimization results and must not trigger new backtests.
-- **D-20:** For each optimized parameter, completed Optuna trials are grouped into `5` equal-width buckets by parameter value.
-- **D-21:** For each parameter, Phase 7 must compute:
+- **D-21:** Parameter sensitivity must reuse existing optimization results and must not trigger new backtests.
+- **D-22:** For each optimized parameter, completed Optuna trials are grouped into `5` equal-width buckets by parameter value.
+- **D-23:** For each parameter, Phase 7 must compute:
   - `correlation_with_objective` using Pearson correlation between parameter value and objective score
   - `sharpe_range_across_buckets` as the range of mean Sharpe across the 5 buckets
-- **D-22:** `most_sensitive = true` is assigned to the top `3` parameters ranked by `sharpe_range_across_buckets`.
-- **D-23:** The parameter sensitivity artifact is saved as `analytics/parameter_sensitivity.csv` with columns:
+- **D-24:** `most_sensitive = true` is assigned to the top `3` parameters ranked by `sharpe_range_across_buckets`.
+- **D-25:** The parameter sensitivity artifact is saved as `analytics/parameter_sensitivity.csv` with columns:
   - `parameter_name`
   - `correlation_with_objective`
   - `sharpe_range_across_buckets`
   - `most_sensitive`
 
 ### Output structure and lifecycle
-- **D-24:** All Phase 7 analytics live under an `analytics/` subdirectory inside the existing timestamped results directory.
-- **D-25:** Backtest analytics layout is locked as:
+- **D-26:** All Phase 7 analytics live under an `analytics/` subdirectory inside the existing timestamped results directory.
+- **D-27:** Backtest analytics layout is locked as:
   - `results/backtests/YYYY-MM-DD_HHMMSS/analytics/audit_log.csv`
   - `results/backtests/YYYY-MM-DD_HHMMSS/analytics/drawdown_episodes.csv`
   - `results/backtests/YYYY-MM-DD_HHMMSS/analytics/underwater_curve.csv`
@@ -135,13 +137,13 @@ Phase 7 adds explainability and analysis on top of the shipped backtest and opti
   - `results/backtests/YYYY-MM-DD_HHMMSS/analytics/breakdowns/by_year.csv`
   - `results/backtests/YYYY-MM-DD_HHMMSS/analytics/breakdowns/by_day_of_week.csv`
   - `results/backtests/YYYY-MM-DD_HHMMSS/analytics/breakdowns/by_hour.csv`
-- **D-26:** Optimization analytics layout is locked as:
+- **D-28:** Optimization analytics layout is locked as:
   - `results/optimization/YYYY-MM-DD_HHMMSS/analytics/parameter_sensitivity.csv`
   - `results/optimization/YYYY-MM-DD_HHMMSS/analytics/breakdowns/` using the same trade-breakdown structure, built from best-run trades
-- **D-27:** Phase 8 tearsheets must be able to consume Phase 7 outputs directly from the filesystem without rerunning the backtest, so Phase 7 artifacts are the canonical source for later reporting.
-- **D-28:** Analytics generation runs automatically after every `backtest` and `optimize` run; it is not a separate command.
-- **D-29:** Analytics failures must warn and continue. They must never block the main run result from being saved.
-- **D-30:** All analytics files must be listed in the run's `manifest.json`.
+- **D-29:** Phase 8 tearsheets must be able to consume Phase 7 outputs directly from the filesystem without rerunning the backtest, so Phase 7 artifacts are the canonical source for later reporting.
+- **D-30:** Analytics generation runs automatically after every `backtest` and `optimize` run; it is not a separate command.
+- **D-31:** Analytics failures must warn and continue. They must never block the main run result from being saved.
+- **D-32:** All analytics files must be listed in the run's `manifest.json`.
 
 ### the agent's Discretion
 - Exact internal module boundaries for audit capture, breakdown aggregation, drawdown analytics, and optimization-sensitivity helpers
