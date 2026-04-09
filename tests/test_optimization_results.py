@@ -129,6 +129,9 @@ def test_run_optimization_writes_ranked_results_and_holdout_exports(tmp_path, mo
     assert (run_dir / "best_run" / "holdout_equity_curve.png").exists()
     assert (run_dir.parent / "latest" / "manifest.json").exists()
     assert (run_dir.parent / "latest" / "ranked_results.csv").exists()
+    assert not (run_dir / "walk_forward").exists()
+    assert not (run_dir / "monte_carlo").exists()
+    assert not (run_dir / "stability").exists()
 
     with (run_dir / "ranked_results.csv").open("r", encoding="utf-8", newline="") as handle:
         rows = list(csv.DictReader(handle))
@@ -165,6 +168,8 @@ def test_run_optimization_writes_ranked_results_and_holdout_exports(tmp_path, mo
     manifest_payload = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert "ranked_results.csv" in manifest_payload["files"]
     assert "optimization_summary.json" in manifest_payload["files"]
+    summary_payload = json.loads((run_dir / "optimization_summary.json").read_text(encoding="utf-8"))
+    assert "analysis_flags" not in summary_payload
 
 
 def test_run_optimization_can_leave_latest_untouched(tmp_path, monkeypatch) -> None:

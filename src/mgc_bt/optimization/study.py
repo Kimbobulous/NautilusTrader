@@ -44,8 +44,29 @@ def run_optimization(
     max_trials: int | None = None,
     refresh_latest: bool = True,
     output: TextIO | None = None,
+    walk_forward: bool = False,
+    final_test: bool = False,
+    monte_carlo: bool = False,
+    stability: bool = False,
+    skip_monte_carlo: bool = False,
+    skip_stability: bool = False,
 ) -> dict[str, Any]:
     out = output or sys.stdout
+    if final_test and not walk_forward:
+        raise ValueError("--final-test requires --walk-forward so the protected six-month test window stays hidden from the default optimize flow.")
+    if final_test:
+        out.write("Warning: final test window will be evaluated and can no longer be treated as untouched.\n")
+        out.flush()
+
+    analysis_flags = _resolve_analysis_flags(
+        walk_forward=walk_forward,
+        final_test=final_test,
+        monte_carlo=monte_carlo,
+        stability=stability,
+        skip_monte_carlo=skip_monte_carlo,
+        skip_stability=skip_stability,
+    )
+    final_test_window = _final_test_window(settings)
     effective_study_name = study_name or settings.optimization.study_name
     effective_max_trials = max_trials or settings.optimization.max_trials
     storage_path = optimization_storage_path(settings)
@@ -99,8 +120,15 @@ def run_optimization(
             "best_params": {},
             "best_value": None,
         }
+        _attach_phase_six_metadata(summary, analysis_flags, final_test_window)
         summary_path = write_optimization_summary_json(run_dir, summary)
-        run_config_path = write_optimization_run_config(settings, run_dir, {})
+        run_config_path = write_optimization_run_config(
+            settings,
+            run_dir,
+            {},
+            analysis_flags=analysis_flags,
+            final_test_window=final_test_window,
+        )
         write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
         latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
         return {
@@ -116,6 +144,7 @@ def run_optimization(
             "best_params": {},
             "best_value": None,
             "overfit_warning": False,
+            "analysis_flags": analysis_flags,
         }
 
     best_trial = study.best_trial
@@ -172,8 +201,15 @@ def run_optimization(
         },
         "overfit_warning": overfit_warning,
     }
+    _attach_phase_six_metadata(summary, analysis_flags, final_test_window)
     summary_path = write_optimization_summary_json(run_dir, summary)
-    run_config_path = write_optimization_run_config(settings, run_dir, best_params)
+    run_config_path = write_optimization_run_config(
+        settings,
+        run_dir,
+        best_params,
+        analysis_flags=analysis_flags,
+        final_test_window=final_test_window,
+    )
     write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
     latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
     return {
@@ -196,6 +232,7 @@ def run_optimization(
         "overfit_warning": overfit_warning,
         "in_sample_result": in_sample_result,
         "holdout_result": holdout_result,
+        "analysis_flags": analysis_flags,
     }
 
 
@@ -300,3 +337,46 @@ def _best_trial_or_none(study: optuna.study.Study) -> optuna.trial.FrozenTrial |
         return study.best_trial
     except ValueError:
         return None
+
+
+def _resolve_analysis_flags(
+    *,
+    walk_forward: bool,
+    final_test: bool,
+    monte_carlo: bool,
+    stability: bool,
+    skip_monte_carlo: bool,
+    skip_stability: bool,
+) -> dict[str, bool]:
+    monte_carlo_enabled = (walk_forward and not skip_monte_carlo) or (monte_carlo and not skip_monte_carlo)
+    stability_enabled = (walk_forward and not skip_stability) or (stability and not skip_stability)
+    return {
+        "walk_forward_enabled": walk_forward,
+        "final_test_requested": final_test,
+        "monte_carlo_enabled": monte_carlo_enabled,
+        "stability_enabled": stability_enabled,
+    }
+
+
+def _final_test_window(settings: Settings) -> dict[str, str]:
+    from pandas import DateOffset
+    from pandas import Timestamp
+
+    holdout_end = Timestamp(settings.optimization.holdout_end, tz="UTC")
+    final_start = holdout_end - DateOffset(months=settings.walk_forward.final_test_months)
+    return {
+        "start": final_start.isoformat(),
+        "end": holdout_end.isoformat(),
+    }
+
+
+def _attach_phase_six_metadata(
+    summary: dict[str, Any],
+    analysis_flags: dict[str, bool],
+    final_test_window: dict[str, str],
+) -> None:
+    if not any(analysis_flags.values()):
+        return
+    summary["analysis_flags"] = analysis_flags
+    summary.update(analysis_flags)
+    summary["final_test_window"] = final_test_window

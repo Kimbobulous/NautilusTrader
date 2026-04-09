@@ -25,6 +25,24 @@ def test_parser_registers_expected_subcommands() -> None:
     assert backtest_args.command == "backtest"
     assert backtest_args.instrument_id == "MGCM4.GLBX"
 
+    optimize_args = parser.parse_args(
+        [
+            "optimize",
+            "--walk-forward",
+            "--final-test",
+            "--monte-carlo",
+            "--stability",
+            "--skip-monte-carlo",
+            "--skip-stability",
+        ],
+    )
+    assert optimize_args.walk_forward is True
+    assert optimize_args.final_test is True
+    assert optimize_args.monte_carlo is True
+    assert optimize_args.stability is True
+    assert optimize_args.skip_monte_carlo is True
+    assert optimize_args.skip_stability is True
+
     health_args = parser.parse_args(["health"])
     assert health_args.command == "health"
 
@@ -44,6 +62,10 @@ def test_settings_loader_uses_expected_sections() -> None:
     assert settings.optimization.seed == 42
     assert settings.optimization.max_trials == 200
     assert settings.optimization.in_sample_start == "2021-03-08T00:00:00+00:00"
+    assert settings.walk_forward.train_months == 12
+    assert settings.walk_forward.final_test_months == 6
+    assert settings.monte_carlo.simulations == 1000
+    assert settings.monte_carlo.percentile_points == (5, 25, 50, 75, 95)
 
 
 def test_cli_errors_when_config_missing() -> None:
@@ -56,11 +78,31 @@ def test_cli_errors_when_config_missing() -> None:
 def test_cli_optimize_uses_shared_study_runner(monkeypatch, capsys) -> None:
     captured: dict[str, object] = {}
 
-    def fake_run_optimization(settings, *, resume=False, study_name=None, max_trials=None, refresh_latest=True, output=None):
+    def fake_run_optimization(
+        settings,
+        *,
+        resume=False,
+        study_name=None,
+        max_trials=None,
+        refresh_latest=True,
+        output=None,
+        walk_forward=False,
+        final_test=False,
+        monte_carlo=False,
+        stability=False,
+        skip_monte_carlo=False,
+        skip_stability=False,
+    ):
         captured["resume"] = resume
         captured["study_name"] = study_name
         captured["max_trials"] = max_trials
         captured["refresh_latest"] = refresh_latest
+        captured["walk_forward"] = walk_forward
+        captured["final_test"] = final_test
+        captured["monte_carlo"] = monte_carlo
+        captured["stability"] = stability
+        captured["skip_monte_carlo"] = skip_monte_carlo
+        captured["skip_stability"] = skip_stability
         return {
             "study_name": study_name or settings.optimization.study_name,
             "seed": settings.optimization.seed,
@@ -86,8 +128,47 @@ def test_cli_optimize_uses_shared_study_runner(monkeypatch, capsys) -> None:
     assert captured["study_name"] == "custom-study"
     assert captured["max_trials"] == 5
     assert captured["refresh_latest"] is False
+    assert captured["walk_forward"] is False
+    assert captured["monte_carlo"] is False
+    assert captured["stability"] is False
     assert "Study: custom-study" in stdout
     assert "Warning: holdout Sharpe is more than 0.3 below in-sample Sharpe." in stdout
+
+
+def test_cli_rejects_final_test_without_walk_forward() -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        main(["optimize", "--final-test"])
+
+    assert excinfo.value.code == 2
+
+
+def test_cli_optimize_can_opt_in_phase_six_analyses(monkeypatch, capsys) -> None:
+    captured: dict[str, object] = {}
+
+    def fake_run_optimization(settings, **kwargs):
+        captured.update(kwargs)
+        return {
+            "study_name": settings.optimization.study_name,
+            "seed": settings.optimization.seed,
+            "completed_trials": 1,
+            "failed_trials": 0,
+            "best_value": 1.0,
+            "best_params": {},
+            "run_dir": "results/optimization/2026-04-09_000000",
+            "latest_dir": None,
+            "storage_path": "results/optimization/optuna_storage.db",
+        }
+
+    monkeypatch.setattr("mgc_bt.optimization.study.run_optimization", fake_run_optimization)
+    exit_code = main(["optimize", "--monte-carlo", "--stability"])
+    capsys.readouterr()
+
+    assert exit_code == 0
+    assert captured["walk_forward"] is False
+    assert captured["monte_carlo"] is True
+    assert captured["stability"] is True
+    assert captured["skip_monte_carlo"] is False
+    assert captured["skip_stability"] is False
 
 
 def test_cli_backtest_reports_missing_catalog_with_actionable_error(tmp_path: Path) -> None:
@@ -170,6 +251,23 @@ in_sample_start = "2021-03-08T00:00:00+00:00"
 in_sample_end = "2025-03-08T00:00:00+00:00"
 holdout_start = "2025-03-08T00:00:00+00:00"
 holdout_end = "2026-03-08T00:00:00+00:00"
+
+[walk_forward]
+train_months = 12
+validation_months = 3
+test_months = 3
+step_months = 3
+validation_top_n = 5
+min_training_bars = 50000
+min_test_trades = 10
+final_test_months = 6
+runtime_warning_minutes = 30
+
+[monte_carlo]
+simulations = 1000
+confidence_level = 0.95
+percentile_points = [5, 25, 50, 75, 95]
+random_seed_offset = 10000
 """,
     )
 

@@ -112,6 +112,9 @@ def write_optimization_run_config(
     settings: Settings,
     run_dir: Path,
     best_params: dict[str, Any],
+    *,
+    analysis_flags: dict[str, bool] | None = None,
+    final_test_window: dict[str, str] | None = None,
 ) -> Path:
     config_path = run_dir / "run_config.toml"
     lines = [
@@ -129,9 +132,33 @@ def write_optimization_run_config(
         f'in_sample_end = "{settings.optimization.in_sample_end}"',
         f'holdout_start = "{settings.optimization.holdout_start}"',
         f'holdout_end = "{settings.optimization.holdout_end}"',
-        "",
-        "[best_params]",
     ]
+    if analysis_flags and any(analysis_flags.values()):
+        lines.extend(
+            [
+                "",
+                "[analysis_flags]",
+                f"walk_forward_enabled = {'true' if analysis_flags['walk_forward_enabled'] else 'false'}",
+                f"final_test_requested = {'true' if analysis_flags['final_test_requested'] else 'false'}",
+                f"monte_carlo_enabled = {'true' if analysis_flags['monte_carlo_enabled'] else 'false'}",
+                f"stability_enabled = {'true' if analysis_flags['stability_enabled'] else 'false'}",
+            ],
+        )
+        if final_test_window is not None:
+            lines.extend(
+                [
+                    "",
+                    "[final_test_window]",
+                    f'start = "{final_test_window["start"]}"',
+                    f'end = "{final_test_window["end"]}"',
+                ],
+            )
+    lines.extend(
+        [
+            "",
+            "[best_params]",
+        ],
+    )
     for key, value in sorted(best_params.items()):
         lines.append(_toml_assignment(key, value))
     config_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

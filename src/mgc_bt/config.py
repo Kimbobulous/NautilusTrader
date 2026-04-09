@@ -97,6 +97,27 @@ class OptimizationConfig:
 
 
 @dataclass(frozen=True)
+class WalkForwardConfig:
+    train_months: int
+    validation_months: int
+    test_months: int
+    step_months: int
+    validation_top_n: int
+    min_training_bars: int
+    min_test_trades: int
+    final_test_months: int
+    runtime_warning_minutes: int
+
+
+@dataclass(frozen=True)
+class MonteCarloConfig:
+    simulations: int
+    confidence_level: float
+    percentile_points: tuple[int, ...]
+    random_seed_offset: int
+
+
+@dataclass(frozen=True)
 class Settings:
     config_path: Path
     paths: PathsConfig
@@ -104,6 +125,8 @@ class Settings:
     backtest: BacktestConfig
     risk: RiskConfig
     optimization: OptimizationConfig
+    walk_forward: WalkForwardConfig
+    monte_carlo: MonteCarloConfig
 
 
 def load_settings(config_path: str | Path) -> Settings:
@@ -117,7 +140,7 @@ def load_settings(config_path: str | Path) -> Settings:
     except tomllib.TOMLDecodeError as exc:
         raise ConfigError(f"Config file is not valid TOML: {exc}") from exc
 
-    for section in ("paths", "ingestion", "backtest", "risk", "optimization"):
+    for section in ("paths", "ingestion", "backtest", "risk", "optimization", "walk_forward", "monte_carlo"):
         if section not in raw:
             raise ConfigError(f"Missing required config section: [{section}]")
 
@@ -132,6 +155,8 @@ def load_settings(config_path: str | Path) -> Settings:
     backtest = raw["backtest"]
     risk = raw["risk"]
     optimization = raw["optimization"]
+    walk_forward = raw["walk_forward"]
+    monte_carlo = raw["monte_carlo"]
 
     settings = Settings(
         config_path=path,
@@ -214,8 +239,26 @@ def load_settings(config_path: str | Path) -> Settings:
             holdout_start=str(optimization.get("holdout_start", "2025-03-08T00:00:00+00:00")),
             holdout_end=str(optimization.get("holdout_end", "2026-03-08T00:00:00+00:00")),
         ),
+        walk_forward=WalkForwardConfig(
+            train_months=int(_require(walk_forward, "train_months", "walk_forward")),
+            validation_months=int(_require(walk_forward, "validation_months", "walk_forward")),
+            test_months=int(_require(walk_forward, "test_months", "walk_forward")),
+            step_months=int(_require(walk_forward, "step_months", "walk_forward")),
+            validation_top_n=int(_require(walk_forward, "validation_top_n", "walk_forward")),
+            min_training_bars=int(_require(walk_forward, "min_training_bars", "walk_forward")),
+            min_test_trades=int(_require(walk_forward, "min_test_trades", "walk_forward")),
+            final_test_months=int(_require(walk_forward, "final_test_months", "walk_forward")),
+            runtime_warning_minutes=int(_require(walk_forward, "runtime_warning_minutes", "walk_forward")),
+        ),
+        monte_carlo=MonteCarloConfig(
+            simulations=int(_require(monte_carlo, "simulations", "monte_carlo")),
+            confidence_level=float(_require(monte_carlo, "confidence_level", "monte_carlo")),
+            percentile_points=tuple(int(value) for value in list(_require(monte_carlo, "percentile_points", "monte_carlo"))),
+            random_seed_offset=int(_require(monte_carlo, "random_seed_offset", "monte_carlo")),
+        ),
     )
     _validate_optimization_settings(settings)
+    _validate_phase_six_settings(settings)
     return settings
 
 
@@ -269,6 +312,38 @@ def _validate_optimization_settings(settings: Settings) -> None:
         raise ConfigError("Optimization holdout start must be earlier than holdout end.")
     if in_sample_end > holdout_start:
         raise ConfigError("Optimization in-sample end must be earlier than or equal to holdout start.")
+
+
+def _validate_phase_six_settings(settings: Settings) -> None:
+    walk_forward_checks = {
+        "train_months": settings.walk_forward.train_months,
+        "validation_months": settings.walk_forward.validation_months,
+        "test_months": settings.walk_forward.test_months,
+        "step_months": settings.walk_forward.step_months,
+        "min_training_bars": settings.walk_forward.min_training_bars,
+        "min_test_trades": settings.walk_forward.min_test_trades,
+        "runtime_warning_minutes": settings.walk_forward.runtime_warning_minutes,
+    }
+    for name, value in walk_forward_checks.items():
+        if value <= 0:
+            raise ConfigError(f"Walk-forward {name} must be greater than zero.")
+    if settings.walk_forward.validation_top_n < 1:
+        raise ConfigError("Walk-forward validation_top_n must be greater than or equal to one.")
+    if settings.walk_forward.final_test_months != 6:
+        raise ConfigError("Walk-forward final_test_months must stay locked to 6.")
+
+    if settings.monte_carlo.simulations <= 0:
+        raise ConfigError("Monte Carlo simulations must be greater than zero.")
+    if settings.monte_carlo.random_seed_offset <= 0:
+        raise ConfigError("Monte Carlo random_seed_offset must be greater than zero.")
+    if not 0.0 < settings.monte_carlo.confidence_level < 1.0:
+        raise ConfigError("Monte Carlo confidence_level must be between 0 and 1.")
+    if not settings.monte_carlo.percentile_points:
+        raise ConfigError("Monte Carlo percentile_points cannot be empty.")
+    if tuple(settings.monte_carlo.percentile_points) != tuple(sorted(settings.monte_carlo.percentile_points)):
+        raise ConfigError("Monte Carlo percentile_points must stay sorted in ascending order.")
+    if any(value < 0 or value > 100 for value in settings.monte_carlo.percentile_points):
+        raise ConfigError("Monte Carlo percentile_points must be within 0..100.")
 
 
 def _coerce_timestamp(value: str):

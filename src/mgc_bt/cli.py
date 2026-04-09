@@ -44,6 +44,12 @@ def build_parser() -> argparse.ArgumentParser:
     optimize_parser.add_argument("--resume", action="store_true", help="Resume an existing named Optuna study instead of starting a new one.")
     optimize_parser.add_argument("--study-name", help="Override the configured Optuna study name.")
     optimize_parser.add_argument("--max-trials", type=int, help="Override the configured maximum trial count.")
+    optimize_parser.add_argument("--walk-forward", action="store_true", help="Run rolling train/validate/test optimization windows on the existing optimize command.")
+    optimize_parser.add_argument("--final-test", action="store_true", help="Evaluate the protected final six-month test window after a walk-forward run.")
+    optimize_parser.add_argument("--monte-carlo", action="store_true", help="Run Monte Carlo analysis after optimization.")
+    optimize_parser.add_argument("--stability", action="store_true", help="Run parameter stability analysis after optimization.")
+    optimize_parser.add_argument("--skip-monte-carlo", action="store_true", help="Skip Monte Carlo analysis when walk-forward would otherwise enable it automatically.")
+    optimize_parser.add_argument("--skip-stability", action="store_true", help="Skip stability analysis when walk-forward would otherwise enable it automatically.")
     optimize_parser.add_argument(
         "--force",
         action="store_true",
@@ -92,6 +98,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "optimize":
             from mgc_bt.optimization.study import run_optimization
 
+            if bool(getattr(args, "final_test", False)) and not bool(getattr(args, "walk_forward", False)):
+                raise CLIError(
+                    "--final-test requires --walk-forward so the protected six-month test window stays hidden from the default optimize flow.",
+                )
             report = preflight_optimize(
                 settings,
                 resume=bool(getattr(args, "resume", False)),
@@ -105,6 +115,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 study_name=getattr(args, "study_name", None),
                 max_trials=getattr(args, "max_trials", None),
                 refresh_latest=bool(getattr(args, "force", False)),
+                walk_forward=bool(getattr(args, "walk_forward", False)),
+                final_test=bool(getattr(args, "final_test", False)),
+                monte_carlo=bool(getattr(args, "monte_carlo", False)),
+                stability=bool(getattr(args, "stability", False)),
+                skip_monte_carlo=bool(getattr(args, "skip_monte_carlo", False)),
+                skip_stability=bool(getattr(args, "skip_stability", False)),
             )
             print(_render_optimization_summary(result))
             return 0
@@ -178,6 +194,14 @@ def _render_optimization_summary(result: dict[str, object]) -> str:
         lines.append(f"Holdout results: {result['holdout_summary_path']}")
     if result.get("overfit_warning"):
         lines.append("Warning: holdout Sharpe is more than 0.3 below in-sample Sharpe.")
+    if result.get("walk_forward_summary_path") is not None:
+        lines.append(f"Walk-forward summary: {result['walk_forward_summary_path']}")
+    if result.get("walk_forward_counts") is not None:
+        counts = result["walk_forward_counts"]
+        lines.append(
+            "Walk-forward windows: "
+            f"completed={counts['completed']}, skipped={counts['skipped']}, inconclusive={counts['inconclusive']}",
+        )
     return "\n".join(lines)
 
 
