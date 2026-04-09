@@ -25,10 +25,12 @@ from mgc_bt.optimization.results import write_stability_artifacts
 from mgc_bt.optimization.results import write_walk_forward_artifacts
 from mgc_bt.optimization.results import write_optimization_manifest
 from mgc_bt.optimization.results import write_optimization_analytics
+from mgc_bt.optimization.results import write_optimization_tearsheet
 from mgc_bt.optimization.results import write_failed_trials_json
 from mgc_bt.optimization.results import write_optimization_run_config
 from mgc_bt.optimization.results import write_optimization_summary_json
 from mgc_bt.optimization.results import write_ranked_results_csv
+from mgc_bt.optimization.results import write_best_run_bundle
 from mgc_bt.optimization.storage import optimization_storage_path
 from mgc_bt.optimization.storage import optimization_storage_url
 from mgc_bt.optimization.stability import run_stability_analysis
@@ -147,6 +149,15 @@ def run_optimization(
             analysis_flags=analysis_flags,
             final_test_window=final_test_window,
         )
+        tearsheet_path = None
+        try:
+            tearsheet_path = write_optimization_tearsheet(run_dir)
+        except FileNotFoundError as exc:
+            out.write(f"Warning: tearsheet generation failed for optimization run: {exc}\n")
+            out.flush()
+        except Exception as exc:
+            out.write(f"Warning: tearsheet generation failed for optimization run: {exc}\n")
+            out.flush()
         write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
         latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
         return {
@@ -154,6 +165,7 @@ def run_optimization(
             "latest_dir": latest_dir,
             "summary_path": summary_path,
             "run_config_path": run_config_path,
+            "tearsheet_path": tearsheet_path,
             "storage_path": storage_path,
             "study_name": effective_study_name,
             "seed": settings.optimization.seed,
@@ -282,6 +294,15 @@ def run_optimization(
     except Exception as exc:
         out.write(f"Warning: optimization analytics generation failed: {exc}\n")
         out.flush()
+    tearsheet_path = None
+    try:
+        tearsheet_path = write_optimization_tearsheet(run_dir)
+    except FileNotFoundError as exc:
+        out.write(f"Warning: tearsheet generation failed for optimization run: {exc}\n")
+        out.flush()
+    except Exception as exc:
+        out.write(f"Warning: tearsheet generation failed for optimization run: {exc}\n")
+        out.flush()
     write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
     latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
     return {
@@ -298,6 +319,7 @@ def run_optimization(
         "best_value": float(best_trial.value) if best_trial.value is not None else None,
         "best_trial_number": best_trial.number,
         "best_run_dir": best_bundle["directory"],
+        "tearsheet_path": tearsheet_path,
         "holdout_summary_path": best_bundle["holdout_summary_path"],
         "holdout_plot_path": best_bundle["holdout_plot_path"],
         "top_10_count": len(top_10_outputs),
@@ -438,6 +460,19 @@ def _run_walk_forward_branch(
         analysis_flags=analysis_flags,
         final_test_window=final_test_window,
     )
+    best_run_dir = None
+    if best_window_result is not None:
+        best_run_dir = run_dir / "best_run"
+        write_best_run_bundle(settings, best_window_result, best_run_dir)
+    tearsheet_path = None
+    try:
+        tearsheet_path = write_optimization_tearsheet(run_dir)
+    except FileNotFoundError as exc:
+        output.write(f"Warning: tearsheet generation failed for optimization run: {exc}\n")
+        output.flush()
+    except Exception as exc:
+        output.write(f"Warning: tearsheet generation failed for optimization run: {exc}\n")
+        output.flush()
     write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
     latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
     return {
@@ -445,6 +480,7 @@ def _run_walk_forward_branch(
         "latest_dir": latest_dir,
         "summary_path": summary_path,
         "run_config_path": run_config_path,
+        "tearsheet_path": tearsheet_path,
         "storage_path": storage_path,
         "study_name": effective_study_name,
         "seed": settings.optimization.seed,
@@ -454,6 +490,7 @@ def _run_walk_forward_branch(
         "best_value": aggregate.aggregated_oos_sharpe,
         "walk_forward_summary_path": artifact_paths["summary_path"],
         "walk_forward_counts": summary["walk_forward_counts"],
+        "best_run_dir": best_run_dir,
         "holdout_summary_path": artifact_paths.get("final_test_summary_path"),
         "holdout_plot_path": artifact_paths.get("final_test_plot_path"),
         "overfit_warning": False,

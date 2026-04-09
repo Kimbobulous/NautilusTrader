@@ -23,11 +23,13 @@ def test_write_backtest_artifacts_creates_canonical_and_latest_outputs(tmp_path:
     assert artifact_paths["latest_dir"].exists()
     assert (artifact_paths["latest_dir"] / "summary.json").exists()
     assert (artifact_paths["latest_dir"] / "equity_curve.png").exists()
+    assert (artifact_paths["latest_dir"] / "tearsheet.html").exists()
     assert (artifact_paths["latest_dir"] / "manifest.json").exists()
     assert (artifact_paths["run_dir"] / "analytics" / "audit_log.csv").exists()
     assert (artifact_paths["run_dir"] / "analytics" / "drawdown_episodes.csv").exists()
     assert (artifact_paths["run_dir"] / "analytics" / "underwater_curve.csv").exists()
     assert (artifact_paths["run_dir"] / "analytics" / "breakdowns" / "by_session.csv").exists()
+    assert (artifact_paths["run_dir"] / "tearsheet.html").exists()
 
     summary_payload = json.loads(artifact_paths["summary_path"].read_text(encoding="utf-8"))
     assert summary_payload["instrument_id"] == "MGCJ1.GLBX"
@@ -48,6 +50,7 @@ def test_write_backtest_artifacts_creates_canonical_and_latest_outputs(tmp_path:
     assert "summary.json" in manifest_payload["files"]
     assert "trades.csv" in manifest_payload["files"]
     assert "analytics/audit_log.csv" in manifest_payload["files"]
+    assert "tearsheet.html" in manifest_payload["files"]
     assert manifest_payload["latest_refreshed"] is True
 
 
@@ -83,6 +86,27 @@ def test_write_backtest_artifacts_warns_and_keeps_core_bundle_when_analytics_fai
     assert artifact_paths["manifest_path"].exists()
     stderr = capsys.readouterr().err
     assert "Warning: analytics generation failed for backtest run" in stderr
+
+
+def test_write_backtest_artifacts_warns_and_keeps_core_bundle_when_tearsheet_fails(tmp_path: Path, monkeypatch, capsys) -> None:
+    settings = load_settings("configs/settings.toml")
+    settings = replace(settings, paths=replace(settings.paths, results_root=tmp_path))
+    result = _sample_result()
+
+    monkeypatch.setattr(
+        "mgc_bt.backtest.artifacts.write_tearsheet",
+        lambda run_dir: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    artifact_paths = write_backtest_artifacts(settings, result)
+
+    assert artifact_paths["summary_path"].exists()
+    assert artifact_paths["trades_path"].exists()
+    assert artifact_paths["config_path"].exists()
+    assert artifact_paths["plot_path"].exists()
+    assert artifact_paths["manifest_path"].exists()
+    stderr = capsys.readouterr().err
+    assert "Warning: tearsheet generation failed for backtest run" in stderr
 
 
 def _sample_result() -> dict[str, object]:

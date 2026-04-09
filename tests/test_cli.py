@@ -112,6 +112,7 @@ def test_cli_optimize_uses_shared_study_runner(monkeypatch, capsys) -> None:
             "best_params": {"supertrend_factor": 2.5},
             "run_dir": "results/optimization/2026-04-09_000000",
             "latest_dir": "results/optimization/latest",
+            "tearsheet_path": "results/optimization/2026-04-09_000000/tearsheet.html",
             "storage_path": "results/optimization/optuna_storage.db",
             "best_run_dir": "results/optimization/2026-04-09_000000/best_run",
             "holdout_summary_path": "results/optimization/2026-04-09_000000/best_run/holdout_results.json",
@@ -132,6 +133,7 @@ def test_cli_optimize_uses_shared_study_runner(monkeypatch, capsys) -> None:
     assert captured["monte_carlo"] is False
     assert captured["stability"] is False
     assert "Study: custom-study" in stdout
+    assert "Tearsheet: results/optimization/2026-04-09_000000/tearsheet.html" in stdout
     assert "Warning: holdout Sharpe is more than 0.3 below in-sample Sharpe." in stdout
 
 

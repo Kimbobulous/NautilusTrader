@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: ready_to_execute
-stopped_at: Phase 8 planned
-last_updated: "2026-04-09T07:23:58.063Z"
-last_activity: 2026-04-09 -- Phase 08 planning complete
+status: ready_to_discuss
+stopped_at: Phase 8 executed
+last_updated: "2026-04-09T21:45:00.000Z"
+last_activity: 2026-04-09 -- Phase 08 execution complete
 progress:
   total_phases: 4
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 12
-  completed_plans: 8
-  percent: 67
+  completed_plans: 12
+  percent: 75
 ---
 
 # Project State
@@ -21,22 +21,22 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Reliable MGC data ingestion and trustworthy event-driven backtests that make optimization results credible enough to act on.
-**Current focus:** Phase 8 - Interactive Tearsheet Reporting
+**Current focus:** Phase 9 - Reusable Strategy Platform
 
 ## Current Position
 
-Phase: 8 - Interactive Tearsheet Reporting
-Plan: 4 plans created
-Status: Ready to execute
-Last activity: 2026-04-09 -- Phase 08 planning complete
+Phase: 9 - Reusable Strategy Platform
+Plan: awaiting discussion
+Status: Ready to discuss
+Last activity: 2026-04-09 -- Phase 08 execution complete
 
-Progress: [#######---] 67%
+Progress: [########--] 75%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 8
+- Total plans completed: 12
 - Average duration: Phase 6 baseline established
 - Total execution time: Phases 6-7 executed in current milestone
 
@@ -46,13 +46,13 @@ Progress: [#######---] 67%
 |-------|-------|-------|----------|
 | 6 | 4 | Completed | Baseline established |
 | 7 | 4 | Completed | Baseline extended |
-| 8 | 4 | Planned | Ready to execute |
-| 9 | - | - | - |
+| 8 | 4 | Completed | Verified |
+| 9 | - | Pending | Next |
 
 **Recent Trend:**
 
-- Last 5 plans: 06-04, 07-01, 07-02, 07-03, 07-04 completed
-- Trend: Phase 8 planning is complete; execution is unblocked
+- Last 5 plans: 07-04, 08-01, 08-02, 08-03, 08-04 completed
+- Trend: Phase 8 shipped cleanly; Phase 9 is unblocked
 
 ## Accumulated Context
 
@@ -83,6 +83,7 @@ Recent decisions affecting current work:
 - Phase 7: Phase 8 tearsheets should read analytics from filesystem artifacts under `analytics/` rather than rerunning backtests
 - Phase 8: Tearsheets must be self-contained `tearsheet.html` files generated automatically and added to the run manifest
 - Phase 8: Missing section inputs should render explicit section-level notices instead of silently dropping content
+- Phase 8: Plotly should be embedded exactly once per tearsheet document to keep file size practical
 
 ### Pending Todos
 
@@ -98,10 +99,11 @@ Recent decisions affecting current work:
 - Phase 6: Keep the current `optimize` path intact by default; walk-forward, Monte Carlo, and stability analysis should extend it without replacing it
 - Phase 6: Final test evaluation must stay hidden unless explicitly requested
 - Phase 8 should consume the new Phase 7 `analytics/` filesystem contract instead of recomputing audit and breakdown data
+- Phase 8 shipped with a shared filesystem-first reporting loader instead of a separate reporting execution path
 - Phase 7 audit capture streams `csv.writer` rows directly from the strategy runtime; keep that memory discipline for any larger analytics outputs
 
 ## Session Continuity
 
-Last session: 2026-04-09 01:00
-Stopped at: Phase 8 context gathered
+Last session: 2026-04-09 21:45
+Stopped at: Phase 8 execution complete
 Resume file: .planning/ROADMAP.md

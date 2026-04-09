@@ -177,6 +177,8 @@ def _render_backtest_summary(result: dict[str, object], artifact_paths: dict[str
     ]
     if artifact_paths is not None:
         lines.append(f"Run directory: {artifact_paths['run_dir']}")
+        if artifact_paths.get("tearsheet_path") is not None:
+            lines.append(f"Tearsheet: {artifact_paths['tearsheet_path']}")
         if artifact_paths.get("latest_dir") is not None:
             lines.append(f"Latest directory: {artifact_paths['latest_dir']}")
         else:
@@ -201,6 +203,8 @@ def _render_optimization_summary(result: dict[str, object]) -> str:
         lines.append("Latest directory: unchanged (use --force to refresh latest)")
     if result.get("best_run_dir") is not None:
         lines.append(f"Best run directory: {result['best_run_dir']}")
+    if result.get("tearsheet_path") is not None:
+        lines.append(f"Tearsheet: {result['tearsheet_path']}")
     if result.get("holdout_summary_path") is not None:
         lines.append(f"Holdout results: {result['holdout_summary_path']}")
     if result.get("overfit_warning"):

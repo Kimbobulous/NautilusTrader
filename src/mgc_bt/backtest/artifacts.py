@@ -12,6 +12,7 @@ from mgc_bt.backtest.analytics import BacktestAnalyticsBundle
 from mgc_bt.backtest.analytics import write_backtest_analytics
 from mgc_bt.backtest.plotting import save_equity_curve_png
 from mgc_bt.config import Settings
+from mgc_bt.reporting import write_tearsheet
 
 
 def write_backtest_artifacts(
@@ -45,9 +46,17 @@ def write_backtest_artifacts(
     except Exception as exc:
         print(f"Warning: analytics generation failed for backtest run: {exc}", file=sys.stderr)
 
+    tearsheet_path: Path | None = None
+    try:
+        tearsheet_path = write_tearsheet(run_dir)
+    except FileNotFoundError as exc:
+        print(f"Warning: tearsheet generation failed for backtest run: {exc}", file=sys.stderr)
+    except Exception as exc:
+        print(f"Warning: tearsheet generation failed for backtest run: {exc}", file=sys.stderr)
+
     write_manifest(
         run_dir,
-        [summary_path, trades_path, config_path, plot_path, *analytics_files],
+        [summary_path, trades_path, config_path, plot_path, *analytics_files, *([tearsheet_path] if tearsheet_path else [])],
         latest_refreshed=refresh_latest,
     )
     refreshed_latest_dir = refresh_latest_dir(run_dir, refresh_latest=refresh_latest)
@@ -59,6 +68,7 @@ def write_backtest_artifacts(
         "trades_path": trades_path,
         "config_path": config_path,
         "plot_path": plot_path,
+        "tearsheet_path": tearsheet_path,
         "manifest_path": manifest_path,
     }
 

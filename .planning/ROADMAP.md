@@ -40,6 +40,7 @@ Priority order for v1.1 is:
 
 ### Phase 8: Interactive Tearsheet Reporting
 
+**Status**: COMPLETE (2026-04-09)
 **Goal**: Generate professional, self-contained interactive HTML tearsheets automatically from backtest and optimization outputs.
 **Depends on**: Phase 7
 **Requirements**: VIZ-01, VIZ-02, VIZ-03
@@ -68,4 +69,4 @@ Priority order for v1.1 is:
 
 ## Next Step
 
-Start with `/gsd-discuss-phase 7` to design the analytics and audit layer on top of the new Phase 6 outputs.
+Start with `/gsd-discuss-phase 9` to design the reusable strategy platform on top of the shipped research, analytics, and tearsheet layers.

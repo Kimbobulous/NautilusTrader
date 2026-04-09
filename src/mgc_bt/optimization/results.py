@@ -21,6 +21,7 @@ from mgc_bt.optimization.analytics import write_optimization_trade_breakdowns
 from mgc_bt.optimization.analytics import write_parameter_sensitivity_csv
 from mgc_bt.optimization.search_space import optimized_param_names
 from mgc_bt.optimization.storage import optimization_root
+from mgc_bt.reporting import write_tearsheet
 
 
 def create_optimization_run_dir(settings: Settings) -> Path:
@@ -215,6 +216,10 @@ def write_best_run_config(settings: Settings, result: dict[str, Any], destinatio
 def write_optimization_manifest(run_dir: Path, *, latest_refreshed: bool) -> Path:
     files = [path for path in run_dir.rglob("*") if path.is_file() and path.name != "manifest.json"]
     return write_manifest(run_dir, files, latest_refreshed=latest_refreshed)
+
+
+def write_optimization_tearsheet(run_dir: Path) -> Path:
+    return write_tearsheet(run_dir)
 
 
 def write_optimization_analytics(
