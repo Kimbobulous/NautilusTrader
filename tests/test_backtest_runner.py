@@ -52,7 +52,7 @@ def test_cli_backtest_uses_shared_runner(monkeypatch, capsys) -> None:
             "total_trades": 4,
         }
 
-    def fake_write_backtest_artifacts(settings, result):
+    def fake_write_backtest_artifacts(settings, result, refresh_latest=True):
         return {
             "run_dir": "results/backtests/2026-04-08_120000",
             "latest_dir": "results/backtests/latest",

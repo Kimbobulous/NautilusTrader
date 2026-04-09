@@ -8,9 +8,15 @@ from mgc_bt.config import ConfigError
 from mgc_bt.config import load_settings
 
 
+def _write_settings_file(path: Path, content: str) -> Path:
+    path.write_text(content.strip() + "\n", encoding="utf-8")
+    return path
+
+
 def test_optimization_settings_validate_ordering(tmp_path: Path) -> None:
     config_path = tmp_path / "settings.toml"
-    config_path.write_text(
+    _write_settings_file(
+        config_path,
         """
 [paths]
 project_root = "."
@@ -89,7 +95,19 @@ in_sample_end = "2026-01-01T00:00:00+00:00"
 holdout_start = "2025-06-01T00:00:00+00:00"
 holdout_end = "2026-06-01T00:00:00+00:00"
 """,
-        encoding="utf-8",
     )
     with pytest.raises(ConfigError):
+        load_settings(config_path)
+
+
+def test_load_settings_wraps_malformed_toml_as_config_error(tmp_path: Path) -> None:
+    config_path = _write_settings_file(
+        tmp_path / "settings.toml",
+        """
+[paths
+project_root = "."
+""",
+    )
+
+    with pytest.raises(ConfigError, match="valid TOML"):
         load_settings(config_path)

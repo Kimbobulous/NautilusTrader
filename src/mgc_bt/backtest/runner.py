@@ -13,6 +13,8 @@ from mgc_bt.backtest.results import aggregate_execution_results
 from mgc_bt.backtest.results import build_segment_execution_result
 from mgc_bt.config import Settings
 
+_LOG_GUARD = None
+
 
 class BacktestError(RuntimeError):
     """Raised when the backtest runner cannot complete."""
@@ -77,6 +79,8 @@ def run_backtest(settings: Settings, params: dict[str, Any] | None = None) -> di
         if engine is None:
             raise BacktestError(f"Backtest engine was not available for {spec.window.instrument_id}.")
 
+        _retain_log_guard(node)
+
         venue = Venue(settings.backtest.venue_name)
         fills_report = engine.trader.generate_order_fills_report()
         positions_report = engine.trader.generate_positions_report()
@@ -109,3 +113,9 @@ def _optional_text(value: object) -> str | None:
         return None
     text = str(value).strip()
     return text or None
+
+
+def _retain_log_guard(node: BacktestNode) -> None:
+    global _LOG_GUARD
+    if _LOG_GUARD is None:
+        _LOG_GUARD = node.get_log_guard()

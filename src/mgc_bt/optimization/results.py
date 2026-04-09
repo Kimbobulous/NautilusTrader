@@ -4,14 +4,16 @@ from datetime import UTC, datetime
 from pathlib import Path
 import csv
 import json
-import shutil
 from typing import Any
 
 import optuna
 
 from mgc_bt.backtest.artifacts import backtest_summary_payload
+from mgc_bt.backtest.artifacts import create_unique_timestamped_dir
 from mgc_bt.backtest.artifacts import persist_backtest_bundle
+from mgc_bt.backtest.artifacts import refresh_latest_dir
 from mgc_bt.backtest.artifacts import render_run_config_toml
+from mgc_bt.backtest.artifacts import write_manifest
 from mgc_bt.backtest.plotting import save_equity_curve_png
 from mgc_bt.config import Settings
 from mgc_bt.optimization.search_space import optimized_param_names
@@ -19,9 +21,10 @@ from mgc_bt.optimization.storage import optimization_root
 
 
 def create_optimization_run_dir(settings: Settings) -> Path:
-    run_dir = optimization_root(settings) / datetime.now(tz=UTC).strftime("%Y-%m-%d_%H%M%S")
-    run_dir.mkdir(parents=True, exist_ok=False)
-    return run_dir
+    return create_unique_timestamped_dir(
+        optimization_root(settings),
+        datetime.now(tz=UTC).strftime("%Y-%m-%d_%H%M%S"),
+    )
 
 
 def ranked_trial_rows(study: optuna.study.Study) -> list[dict[str, Any]]:
@@ -136,10 +139,9 @@ def write_optimization_run_config(
 
 
 def refresh_latest_results(run_dir: Path) -> Path:
-    latest_dir = run_dir.parent / "latest"
-    if latest_dir.exists():
-        shutil.rmtree(latest_dir)
-    shutil.copytree(run_dir, latest_dir)
+    latest_dir = refresh_latest_dir(run_dir, refresh_latest=True)
+    if latest_dir is None:  # pragma: no cover - helper contract keeps this unreachable
+        raise RuntimeError("Latest refresh unexpectedly returned None.")
     return latest_dir
 
 
@@ -153,7 +155,8 @@ def write_top_trial_bundle(destination: Path, result: dict[str, Any]) -> dict[st
     plot_path = destination / "equity_curve.png"
     summary_path.write_text(json.dumps(backtest_summary_payload(result), indent=2), encoding="utf-8")
     save_equity_curve_png(result["equity_curve"], plot_path)
-    return {"summary_path": summary_path, "plot_path": plot_path}
+    manifest_path = write_manifest(destination, [summary_path, plot_path], latest_refreshed=None)
+    return {"summary_path": summary_path, "plot_path": plot_path, "manifest_path": manifest_path}
 
 
 def write_holdout_files(destination: Path, result: dict[str, Any]) -> dict[str, Path]:
@@ -162,13 +165,22 @@ def write_holdout_files(destination: Path, result: dict[str, Any]) -> dict[str, 
     plot_path = destination / "holdout_equity_curve.png"
     summary_path.write_text(json.dumps(backtest_summary_payload(result), indent=2), encoding="utf-8")
     save_equity_curve_png(result["equity_curve"], plot_path)
+    existing_files = [path for path in destination.iterdir() if path.is_file() and path.name != "manifest.json"]
+    write_manifest(destination, existing_files, latest_refreshed=None)
     return {"summary_path": summary_path, "plot_path": plot_path}
 
 
 def write_best_run_config(settings: Settings, result: dict[str, Any], destination: Path) -> Path:
     config_path = destination / "run_config.toml"
     config_path.write_text(render_run_config_toml(settings, result), encoding="utf-8")
+    existing_files = [path for path in destination.iterdir() if path.is_file() and path.name != "manifest.json"]
+    write_manifest(destination, existing_files, latest_refreshed=None)
     return config_path
+
+
+def write_optimization_manifest(run_dir: Path, *, latest_refreshed: bool) -> Path:
+    files = [path for path in run_dir.rglob("*") if path.is_file() and path.name != "manifest.json"]
+    return write_manifest(run_dir, files, latest_refreshed=latest_refreshed)
 
 
 def _float_or_none(value: Any) -> float | None:

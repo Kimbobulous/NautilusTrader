@@ -111,8 +111,11 @@ def load_settings(config_path: str | Path) -> Settings:
     if not path.exists():
         raise ConfigError(f"Config file not found: {path}")
 
-    with path.open("rb") as handle:
-        raw = tomllib.load(handle)
+    try:
+        with path.open("rb") as handle:
+            raw = tomllib.load(handle)
+    except tomllib.TOMLDecodeError as exc:
+        raise ConfigError(f"Config file is not valid TOML: {exc}") from exc
 
     for section in ("paths", "ingestion", "backtest", "risk", "optimization"):
         if section not in raw:

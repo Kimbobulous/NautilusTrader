@@ -19,9 +19,11 @@ def test_write_backtest_artifacts_creates_canonical_and_latest_outputs(tmp_path:
     assert artifact_paths["trades_path"].exists()
     assert artifact_paths["config_path"].exists()
     assert artifact_paths["plot_path"].exists()
+    assert artifact_paths["manifest_path"].exists()
     assert artifact_paths["latest_dir"].exists()
     assert (artifact_paths["latest_dir"] / "summary.json").exists()
     assert (artifact_paths["latest_dir"] / "equity_curve.png").exists()
+    assert (artifact_paths["latest_dir"] / "manifest.json").exists()
 
     summary_payload = json.loads(artifact_paths["summary_path"].read_text(encoding="utf-8"))
     assert summary_payload["instrument_id"] == "MGCJ1.GLBX"
@@ -36,6 +38,24 @@ def test_write_backtest_artifacts_creates_canonical_and_latest_outputs(tmp_path:
     assert 'instrument_id = "MGCJ1.GLBX"' in run_config_text
     assert 'roll_source = "explicit"' in run_config_text
     assert "max_drawdown_pct = 5.0" in run_config_text
+
+    manifest_payload = json.loads(artifact_paths["manifest_path"].read_text(encoding="utf-8"))
+    assert "summary.json" in manifest_payload["files"]
+    assert "trades.csv" in manifest_payload["files"]
+    assert manifest_payload["latest_refreshed"] is True
+
+
+def test_write_backtest_artifacts_can_leave_latest_untouched(tmp_path: Path) -> None:
+    settings = load_settings("configs/settings.toml")
+    settings = replace(settings, paths=replace(settings.paths, results_root=tmp_path))
+    result = _sample_result()
+
+    artifact_paths = write_backtest_artifacts(settings, result, refresh_latest=False)
+
+    assert artifact_paths["latest_dir"] is None
+    assert not (tmp_path / settings.backtest.results_subdir / "latest").exists()
+    manifest_payload = json.loads(artifact_paths["manifest_path"].read_text(encoding="utf-8"))
+    assert manifest_payload["latest_refreshed"] is False
 
 
 def _sample_result() -> dict[str, object]:

@@ -19,6 +19,7 @@ from mgc_bt.optimization.results import create_optimization_run_dir
 from mgc_bt.optimization.results import failed_trial_rows
 from mgc_bt.optimization.results import ranked_trial_rows
 from mgc_bt.optimization.results import refresh_latest_results
+from mgc_bt.optimization.results import write_optimization_manifest
 from mgc_bt.optimization.results import write_failed_trials_json
 from mgc_bt.optimization.results import write_optimization_run_config
 from mgc_bt.optimization.results import write_optimization_summary_json
@@ -41,6 +42,7 @@ def run_optimization(
     resume: bool = False,
     study_name: str | None = None,
     max_trials: int | None = None,
+    refresh_latest: bool = True,
     output: TextIO | None = None,
 ) -> dict[str, Any]:
     out = output or sys.stdout
@@ -99,7 +101,8 @@ def run_optimization(
         }
         summary_path = write_optimization_summary_json(run_dir, summary)
         run_config_path = write_optimization_run_config(settings, run_dir, {})
-        latest_dir = refresh_latest_results(run_dir)
+        write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
+        latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
         return {
             "run_dir": run_dir,
             "latest_dir": latest_dir,
@@ -171,7 +174,8 @@ def run_optimization(
     }
     summary_path = write_optimization_summary_json(run_dir, summary)
     run_config_path = write_optimization_run_config(settings, run_dir, best_params)
-    latest_dir = refresh_latest_results(run_dir)
+    write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
+    latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
     return {
         "run_dir": run_dir,
         "latest_dir": latest_dir,

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+import csv
+import json
 
 import optuna
 
@@ -119,12 +121,110 @@ def test_run_optimization_writes_ranked_results_and_holdout_exports(tmp_path, mo
     assert (run_dir / "optimization_summary.json").exists()
     assert (run_dir / "run_config.toml").exists()
     assert (run_dir / "failed_trials.json").exists()
+    assert (run_dir / "manifest.json").exists()
     assert (run_dir / "best_run" / "summary.json").exists()
     assert (run_dir / "best_run" / "trades.csv").exists()
     assert (run_dir / "best_run" / "equity_curve.png").exists()
     assert (run_dir / "best_run" / "holdout_results.json").exists()
     assert (run_dir / "best_run" / "holdout_equity_curve.png").exists()
+    assert (run_dir.parent / "latest" / "manifest.json").exists()
     assert (run_dir.parent / "latest" / "ranked_results.csv").exists()
+
+    with (run_dir / "ranked_results.csv").open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows
+    assert rows[0].keys() == {
+        "rank",
+        "trial_number",
+        "objective_score",
+        "sharpe_ratio",
+        "total_pnl",
+        "win_rate",
+        "max_drawdown_pct",
+        "total_trades",
+        "param_supertrend_atr_length",
+        "param_supertrend_factor",
+        "param_supertrend_training_period",
+        "param_vwap_reset_hour_utc",
+        "param_wavetrend_n1",
+        "param_wavetrend_n2",
+        "param_wavetrend_ob_level",
+        "param_delta_imbalance_threshold",
+        "param_absorption_volume_multiplier",
+        "param_absorption_range_multiplier",
+        "param_volume_lookback",
+        "param_atr_trail_length",
+        "param_atr_trail_multiplier",
+        "param_min_pullback_bars",
+        "param_max_loss_per_trade_dollars",
+        "param_max_daily_loss_dollars",
+        "param_max_consecutive_losses",
+        "param_max_drawdown_pct",
+    }
+
+    manifest_payload = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
+    assert "ranked_results.csv" in manifest_payload["files"]
+    assert "optimization_summary.json" in manifest_payload["files"]
+
+
+def test_run_optimization_can_leave_latest_untouched(tmp_path, monkeypatch) -> None:
+    settings = _temp_settings(tmp_path)
+
+    def fake_sample_trial_params(trial):
+        return {
+            "supertrend_atr_length": 5,
+            "supertrend_factor": 2.0,
+            "supertrend_training_period": 50,
+            "vwap_reset_hour_utc": 0,
+            "wavetrend_n1": 10,
+            "wavetrend_n2": 21,
+            "wavetrend_ob_level": 2.0,
+            "delta_imbalance_threshold": 0.3,
+            "absorption_volume_multiplier": 1.2,
+            "absorption_range_multiplier": 0.5,
+            "volume_lookback": 20,
+            "atr_trail_length": 14,
+            "atr_trail_multiplier": 2.0,
+            "min_pullback_bars": 2,
+            "max_loss_per_trade_dollars": 101.0,
+            "max_daily_loss_dollars": 301.0,
+            "max_consecutive_losses": 3,
+            "max_drawdown_pct": 5.0,
+        }
+
+    def fake_run_backtest(settings, params):
+        return {
+            "mode": "auto_roll",
+            "instrument_id": "AUTO_ROLL:MGC",
+            "segment_instruments": ["MGCJ1.GLBX"],
+            "segment_count": 1,
+            "start_date": params["start_date"],
+            "end_date": params["end_date"],
+            "total_pnl": 500.0,
+            "sharpe_ratio": 1.0,
+            "win_rate": 55.0,
+            "max_drawdown": 250.0,
+            "max_drawdown_pct": 10.0,
+            "total_trades": 50,
+            "parameters": params,
+            "segments": [],
+            "trade_log": [],
+            "equity_curve": [
+                {"timestamp": params["start_date"], "equity": 50000.0},
+                {"timestamp": params["end_date"], "equity": 50500.0},
+            ],
+        }
+
+    monkeypatch.setattr("mgc_bt.optimization.objective.sample_trial_params", fake_sample_trial_params)
+    monkeypatch.setattr("mgc_bt.optimization.objective.run_backtest", fake_run_backtest)
+    monkeypatch.setattr("mgc_bt.optimization.export.run_backtest", fake_run_backtest)
+
+    result = run_optimization(settings, study_name="opt-no-latest", max_trials=1, refresh_latest=False)
+
+    assert result["latest_dir"] is None
+    assert not (result["run_dir"].parent / "latest").exists()
+    manifest_payload = json.loads((result["run_dir"] / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest_payload["latest_refreshed"] is False
 
 
 def _temp_settings(tmp_path: Path):

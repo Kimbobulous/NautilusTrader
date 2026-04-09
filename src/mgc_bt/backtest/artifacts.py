@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 import json
 import shutil
-from typing import Any
+from typing import Any, Iterable
 
 import pandas as pd
 
@@ -12,17 +12,22 @@ from mgc_bt.backtest.plotting import save_equity_curve_png
 from mgc_bt.config import Settings
 
 
-def write_backtest_artifacts(settings: Settings, result: dict[str, Any]) -> dict[str, Path]:
+def write_backtest_artifacts(
+    settings: Settings,
+    result: dict[str, Any],
+    *,
+    refresh_latest: bool = True,
+) -> dict[str, Path | None]:
     backtests_root = settings.paths.results_root / settings.backtest.results_subdir
     timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H%M%S")
-    run_dir = backtests_root / timestamp
+    run_dir = create_unique_timestamped_dir(backtests_root, timestamp)
     latest_dir = backtests_root / "latest"
 
-    run_dir.mkdir(parents=True, exist_ok=False)
     summary_path = run_dir / "summary.json"
     trades_path = run_dir / "trades.csv"
     config_path = run_dir / "run_config.toml"
     plot_path = run_dir / "equity_curve.png"
+    manifest_path = run_dir / "manifest.json"
 
     persist_backtest_bundle(
         settings=settings,
@@ -30,17 +35,21 @@ def write_backtest_artifacts(settings: Settings, result: dict[str, Any]) -> dict
         run_dir=run_dir,
     )
 
-    if latest_dir.exists():
-        shutil.rmtree(latest_dir)
-    shutil.copytree(run_dir, latest_dir)
+    write_manifest(
+        run_dir,
+        [summary_path, trades_path, config_path, plot_path],
+        latest_refreshed=refresh_latest,
+    )
+    refreshed_latest_dir = refresh_latest_dir(run_dir, refresh_latest=refresh_latest)
 
     return {
         "run_dir": run_dir,
-        "latest_dir": latest_dir,
+        "latest_dir": refreshed_latest_dir,
         "summary_path": summary_path,
         "trades_path": trades_path,
         "config_path": config_path,
         "plot_path": plot_path,
+        "manifest_path": manifest_path,
     }
 
 
@@ -66,11 +75,17 @@ def persist_backtest_bundle(
 
     config_path.write_text(render_run_config_toml(settings, result), encoding="utf-8")
     save_equity_curve_png(result["equity_curve"], plot_path)
+    write_manifest(
+        run_dir,
+        [summary_path, trades_path, config_path, plot_path],
+        latest_refreshed=None,
+    )
     return {
         "summary_path": summary_path,
         "trades_path": trades_path,
         "config_path": config_path,
         "plot_path": plot_path,
+        "manifest_path": run_dir / "manifest.json",
     }
 
 
@@ -177,3 +192,42 @@ def _render_notional_table(values: dict[str, int]) -> str:
         return "{}"
     inner = ", ".join(f'"{key}" = {value}' for key, value in sorted(values.items()))
     return "{ " + inner + " }"
+
+
+def create_unique_timestamped_dir(root: Path, timestamp: str) -> Path:
+    root.mkdir(parents=True, exist_ok=True)
+    candidate = root / timestamp
+    suffix = 1
+    while candidate.exists():
+        candidate = root / f"{timestamp}_{suffix:02d}"
+        suffix += 1
+    candidate.mkdir(parents=True, exist_ok=False)
+    return candidate
+
+
+def refresh_latest_dir(run_dir: Path, *, refresh_latest: bool) -> Path | None:
+    if not refresh_latest:
+        return None
+
+    latest_dir = run_dir.parent / "latest"
+    if latest_dir.exists():
+        shutil.rmtree(latest_dir)
+    shutil.copytree(run_dir, latest_dir)
+    return latest_dir
+
+
+def write_manifest(
+    run_dir: Path,
+    files: Iterable[Path],
+    *,
+    latest_refreshed: bool | None,
+) -> Path:
+    manifest_path = run_dir / "manifest.json"
+    payload: dict[str, Any] = {
+        "generated_at": datetime.now(tz=UTC).isoformat(),
+        "files": sorted(str(path.relative_to(run_dir).as_posix()) for path in files),
+    }
+    if latest_refreshed is not None:
+        payload["latest_refreshed"] = latest_refreshed
+    manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+    return manifest_path
