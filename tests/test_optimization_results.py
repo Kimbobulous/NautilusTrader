@@ -368,6 +368,10 @@ def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -
     assert (result["run_dir"] / "monte_carlo" / "bootstrap_summary.json").exists()
     assert (result["run_dir"] / "monte_carlo" / "equity_confidence_bands.csv").exists()
     assert (result["run_dir"] / "monte_carlo" / "monte_carlo_summary.json").exists()
+    assert (result["run_dir"] / "stability" / "param_importance.json").exists()
+    assert (result["run_dir"] / "stability" / "top_pair_heatmap.csv").exists()
+    assert (result["run_dir"] / "stability" / "neighborhood_robustness.json").exists()
+    assert (result["run_dir"] / "stability" / "stability_summary.json").exists()
 
     summary_payload = json.loads((walk_root / "aggregated_summary.json").read_text(encoding="utf-8"))
     assert summary_payload["schema_version"] == 1
@@ -380,6 +384,11 @@ def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -
     )
     assert monte_carlo_payload["schema_version"] == 1
     assert monte_carlo_payload["analysis_type"] == "monte_carlo"
+    stability_payload = json.loads(
+        ((result["run_dir"] / "stability" / "stability_summary.json").read_text(encoding="utf-8")),
+    )
+    assert stability_payload["schema_version"] == 1
+    assert stability_payload["analysis_type"] == "stability"
 
 
 def _temp_settings(tmp_path: Path):

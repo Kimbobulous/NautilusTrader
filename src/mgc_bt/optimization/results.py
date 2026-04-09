@@ -330,6 +330,82 @@ def write_monte_carlo_artifacts(run_dir: Path, analysis: dict[str, Any]) -> dict
     }
 
 
+def write_stability_artifacts(run_dir: Path, analysis: dict[str, Any]) -> dict[str, Path]:
+    stability_root = run_dir / "stability"
+    stability_root.mkdir(parents=True, exist_ok=True)
+
+    importance_path = stability_root / "param_importance.json"
+    importance_payload = {
+        "schema_version": 1,
+        "run_type": "optimize",
+        "analysis_type": "stability",
+        "top_parameters": analysis.get("top_parameters", []),
+        "param_importance": analysis.get("param_importance", {}),
+        "robustness_score": analysis.get("robustness_score", 0.0),
+        "robust": analysis.get("robust", False),
+        "status": analysis.get("status"),
+    }
+    if analysis.get("skipped_reason") is not None:
+        importance_payload["skipped_reason"] = analysis["skipped_reason"]
+    importance_path.write_text(json.dumps(importance_payload, indent=2), encoding="utf-8")
+
+    heatmap_path = stability_root / "top_pair_heatmap.csv"
+    heatmap_rows = analysis.get("heatmap_rows", [])
+    heatmap_fields = list(heatmap_rows[0].keys()) if heatmap_rows else [
+        "parameter_x",
+        "parameter_y",
+        "offset_x_pct",
+        "offset_y_pct",
+        "value_x",
+        "value_y",
+        "sharpe_ratio",
+        "total_pnl",
+        "max_drawdown_pct",
+    ]
+    with heatmap_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=heatmap_fields)
+        writer.writeheader()
+        for row in heatmap_rows:
+            writer.writerow(row)
+
+    neighborhood_path = stability_root / "neighborhood_robustness.json"
+    neighborhood_payload = {
+        "schema_version": 1,
+        "run_type": "optimize",
+        "analysis_type": "stability",
+        "top_parameters": analysis.get("top_parameters", []),
+        "robustness_score": analysis.get("robustness_score", 0.0),
+        "robust": analysis.get("robust", False),
+        "status": analysis.get("status"),
+        **analysis.get("neighborhood", {}),
+    }
+    if analysis.get("skipped_reason") is not None:
+        neighborhood_payload["skipped_reason"] = analysis["skipped_reason"]
+    neighborhood_path.write_text(json.dumps(neighborhood_payload, indent=2), encoding="utf-8")
+
+    summary_path = stability_root / "stability_summary.json"
+    summary_payload = {
+        "schema_version": 1,
+        "run_type": "optimize",
+        "analysis_type": "stability",
+        "top_parameters": analysis.get("top_parameters", []),
+        "robustness_score": analysis.get("robustness_score", 0.0),
+        "robust": analysis.get("robust", False),
+        "status": analysis.get("status"),
+    }
+    if analysis.get("skipped_reason") is not None:
+        summary_payload["skipped_reason"] = analysis["skipped_reason"]
+    summary_path.write_text(json.dumps(summary_payload, indent=2), encoding="utf-8")
+
+    return {
+        "root": stability_root,
+        "importance_path": importance_path,
+        "heatmap_path": heatmap_path,
+        "neighborhood_path": neighborhood_path,
+        "summary_path": summary_path,
+    }
+
+
 def _float_or_none(value: Any) -> float | None:
     if value is None:
         return None

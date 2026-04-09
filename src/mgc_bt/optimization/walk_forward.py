@@ -109,6 +109,7 @@ def run_walk_forward_optimization(
     runtime_warning = _RuntimeWarningState()
     window_results: list[WalkForwardWindowResult] = []
     failed_trials: list[dict[str, Any]] = []
+    training_trials: list[optuna.trial.FrozenTrial] = []
     cumulative_oos_pnl = 0.0
 
     for window in windows:
@@ -176,6 +177,7 @@ def run_walk_forward_optimization(
         )
         failed_trials.extend(_failed_trial_rows(window.index, study))
         completed_trials = [trial for trial in study.trials if trial.state == optuna.trial.TrialState.COMPLETE]
+        training_trials.extend(completed_trials)
         if not completed_trials:
             skipped = WalkForwardWindowResult(
                 window_index=window.index,
@@ -264,6 +266,7 @@ def run_walk_forward_optimization(
         "aggregate": aggregate,
         "failed_trials": failed_trials,
         "final_test_result": final_test_result,
+        "training_trials": training_trials,
     }
 
 

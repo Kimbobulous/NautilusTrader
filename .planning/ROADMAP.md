@@ -16,6 +16,7 @@ Priority order for v1.1 is:
 
 ### Phase 6: Research Integrity Framework
 
+**Status**: COMPLETE (2026-04-09)
 **Goal**: Add statistically trustworthy validation workflows on top of the existing optimization pipeline without changing the current strategy behavior.
 **Depends on**: v1.0 shipped baseline
 **Requirements**: INT-01, INT-02, INT-03, INT-04
@@ -66,4 +67,4 @@ Priority order for v1.1 is:
 
 ## Next Step
 
-Start with `/gsd-discuss-phase 6` to lock the research-integrity decisions before planning implementation.
+Start with `/gsd-discuss-phase 7` to design the analytics and audit layer on top of the new Phase 6 outputs.

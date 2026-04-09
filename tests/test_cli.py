@@ -209,6 +209,7 @@ def test_cli_optimize_reports_monte_carlo_states(monkeypatch, capsys) -> None:
             "latest_dir": None,
             "storage_path": "results/optimization/optuna_storage.db",
             "monte_carlo_status": "not_requested",
+            "stability_status": "not_requested",
         },
         {
             "study_name": "b",
@@ -221,6 +222,7 @@ def test_cli_optimize_reports_monte_carlo_states(monkeypatch, capsys) -> None:
             "latest_dir": None,
             "storage_path": "results/optimization/optuna_storage.db",
             "monte_carlo_status": "skipped_by_flag",
+            "stability_status": "skipped_by_flag",
         },
     ]
 
@@ -236,6 +238,8 @@ def test_cli_optimize_reports_monte_carlo_states(monkeypatch, capsys) -> None:
 
     assert "Monte Carlo: not requested" in stdout_default
     assert "Monte Carlo: skipped by flag" in stdout_skipped
+    assert "Stability: not requested" in stdout_default
+    assert "Stability: skipped by flag" in stdout_skipped
 
 
 def test_cli_backtest_reports_missing_catalog_with_actionable_error(tmp_path: Path) -> None:

@@ -5,31 +5,44 @@ from typing import Any
 import optuna
 
 
+PARAM_SPECS: dict[str, dict[str, Any]] = {
+    "supertrend_atr_length": {"type": "int", "low": 5, "high": 20},
+    "supertrend_factor": {"type": "float", "low": 1.5, "high": 5.0},
+    "supertrend_training_period": {"type": "int", "low": 50, "high": 200},
+    "vwap_reset_hour_utc": {"type": "int", "low": 0, "high": 23},
+    "wavetrend_n1": {"type": "int", "low": 5, "high": 20},
+    "wavetrend_n2": {"type": "int", "low": 10, "high": 30},
+    "wavetrend_ob_level": {"type": "float", "low": 1.5, "high": 3.0},
+    "delta_imbalance_threshold": {"type": "float", "low": 0.3, "high": 0.8},
+    "absorption_volume_multiplier": {"type": "float", "low": 1.2, "high": 2.5},
+    "absorption_range_multiplier": {"type": "float", "low": 0.4, "high": 0.8},
+    "volume_lookback": {"type": "int", "low": 10, "high": 30},
+    "atr_trail_length": {"type": "int", "low": 10, "high": 20},
+    "atr_trail_multiplier": {"type": "float", "low": 1.0, "high": 4.0},
+    "min_pullback_bars": {"type": "int", "low": 2, "high": 8},
+    "max_loss_per_trade_dollars": {"type": "float", "low": 75.0, "high": 250.0},
+    "max_daily_loss_dollars": {"type": "float", "low": 150.0, "high": 600.0},
+    "max_consecutive_losses": {"type": "int", "low": 2, "high": 8},
+    "max_drawdown_pct": {"type": "float", "low": 2.0, "high": 10.0},
+}
+
+
 def sample_trial_params(trial: optuna.trial.Trial) -> dict[str, Any]:
-    return {
-        "supertrend_atr_length": trial.suggest_int("supertrend_atr_length", 5, 20),
-        "supertrend_factor": trial.suggest_float("supertrend_factor", 1.5, 5.0),
-        "supertrend_training_period": trial.suggest_int("supertrend_training_period", 50, 200),
-        "vwap_reset_hour_utc": trial.suggest_int("vwap_reset_hour_utc", 0, 23),
-        "wavetrend_n1": trial.suggest_int("wavetrend_n1", 5, 20),
-        "wavetrend_n2": trial.suggest_int("wavetrend_n2", 10, 30),
-        "wavetrend_ob_level": trial.suggest_float("wavetrend_ob_level", 1.5, 3.0),
-        "delta_imbalance_threshold": trial.suggest_float("delta_imbalance_threshold", 0.3, 0.8),
-        "absorption_volume_multiplier": trial.suggest_float("absorption_volume_multiplier", 1.2, 2.5),
-        "absorption_range_multiplier": trial.suggest_float("absorption_range_multiplier", 0.4, 0.8),
-        "volume_lookback": trial.suggest_int("volume_lookback", 10, 30),
-        "atr_trail_length": trial.suggest_int("atr_trail_length", 10, 20),
-        "atr_trail_multiplier": trial.suggest_float("atr_trail_multiplier", 1.0, 4.0),
-        "min_pullback_bars": trial.suggest_int("min_pullback_bars", 2, 8),
-        "max_loss_per_trade_dollars": trial.suggest_float("max_loss_per_trade_dollars", 75.0, 250.0),
-        "max_daily_loss_dollars": trial.suggest_float("max_daily_loss_dollars", 150.0, 600.0),
-        "max_consecutive_losses": trial.suggest_int("max_consecutive_losses", 2, 8),
-        "max_drawdown_pct": trial.suggest_float("max_drawdown_pct", 2.0, 10.0),
-    }
+    params: dict[str, Any] = {}
+    for name, spec in PARAM_SPECS.items():
+        if spec["type"] == "int":
+            params[name] = trial.suggest_int(name, spec["low"], spec["high"])
+        else:
+            params[name] = trial.suggest_float(name, spec["low"], spec["high"])
+    return params
 
 
 def optimized_param_names() -> list[str]:
     return list(sample_trial_params(_ParamNameTrial()).keys())
+
+
+def parameter_spec(name: str) -> dict[str, Any]:
+    return dict(PARAM_SPECS[name])
 
 
 class _ParamNameTrial:

@@ -21,6 +21,7 @@ from mgc_bt.optimization.results import failed_trial_rows
 from mgc_bt.optimization.results import ranked_trial_rows
 from mgc_bt.optimization.results import refresh_latest_results
 from mgc_bt.optimization.results import write_monte_carlo_artifacts
+from mgc_bt.optimization.results import write_stability_artifacts
 from mgc_bt.optimization.results import write_walk_forward_artifacts
 from mgc_bt.optimization.results import write_optimization_manifest
 from mgc_bt.optimization.results import write_failed_trials_json
@@ -29,6 +30,7 @@ from mgc_bt.optimization.results import write_optimization_summary_json
 from mgc_bt.optimization.results import write_ranked_results_csv
 from mgc_bt.optimization.storage import optimization_storage_path
 from mgc_bt.optimization.storage import optimization_storage_url
+from mgc_bt.optimization.stability import run_stability_analysis
 from mgc_bt.optimization.walk_forward import run_walk_forward_optimization
 
 
@@ -252,6 +254,23 @@ def run_optimization(
             confidence_level=settings.monte_carlo.confidence_level,
         )
         monte_carlo_paths = write_monte_carlo_artifacts(run_dir, monte_carlo_result)
+    stability_paths = None
+    stability_status = _analysis_status(
+        enabled=analysis_flags["stability_enabled"],
+        skipped_by_flag=skip_stability,
+    )
+    if analysis_flags["stability_enabled"]:
+        stability_result = run_stability_analysis(
+            settings=settings,
+            study=study,
+            best_params=best_params,
+            evaluation_context={
+                "mode": "holdout",
+                "start": settings.optimization.holdout_start,
+                "end": settings.optimization.holdout_end,
+            },
+        )
+        stability_paths = write_stability_artifacts(run_dir, stability_result)
     write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
     latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
     return {
@@ -277,10 +296,8 @@ def run_optimization(
         "analysis_flags": analysis_flags,
         "monte_carlo_summary_path": monte_carlo_paths["summary_path"] if monte_carlo_paths else None,
         "monte_carlo_status": monte_carlo_status,
-        "stability_status": _analysis_status(
-            enabled=analysis_flags["stability_enabled"],
-            skipped_by_flag=skip_stability,
-        ),
+        "stability_summary_path": stability_paths["summary_path"] if stability_paths else None,
+        "stability_status": stability_status,
     }
 
 
@@ -362,6 +379,27 @@ def _run_walk_forward_branch(
             confidence_level=settings.monte_carlo.confidence_level,
         )
         monte_carlo_paths = write_monte_carlo_artifacts(run_dir, monte_carlo_result)
+    stability_paths = None
+    stability_status = _analysis_status(
+        enabled=analysis_flags["stability_enabled"],
+        skipped_by_flag=False,
+    )
+    if analysis_flags["stability_enabled"]:
+        stability_result = run_stability_analysis(
+            settings=settings,
+            study=_study_from_trials(walk_forward_run.get("training_trials", []), settings.optimization.direction),
+            best_params=_strip_window_index(aggregate.selected_params[-1]) if aggregate.selected_params else {},
+            evaluation_context={
+                "mode": "walk_forward",
+                "windows": [
+                    {"start": item.test_start, "end": item.test_end}
+                    for item in window_results
+                    if item.status != "skipped"
+                ],
+                "min_test_trades": settings.walk_forward.min_test_trades,
+            },
+        )
+        stability_paths = write_stability_artifacts(run_dir, stability_result)
     _attach_phase_six_metadata(summary, analysis_flags, final_test_window)
     summary_path = write_optimization_summary_json(run_dir, summary)
     run_config_path = write_optimization_run_config(
@@ -393,10 +431,8 @@ def _run_walk_forward_branch(
         "analysis_flags": analysis_flags,
         "monte_carlo_summary_path": monte_carlo_paths["summary_path"] if monte_carlo_paths else None,
         "monte_carlo_status": monte_carlo_status,
-        "stability_status": _analysis_status(
-            enabled=analysis_flags["stability_enabled"],
-            skipped_by_flag=False,
-        ),
+        "stability_summary_path": stability_paths["summary_path"] if stability_paths else None,
+        "stability_status": stability_status,
     }
 
 
@@ -593,3 +629,17 @@ def _select_trade_log_for_monte_carlo(
     if in_sample_result is not None and in_sample_result.get("trade_log"):
         return list(in_sample_result["trade_log"])
     return []
+
+
+def _study_from_trials(
+    trials: list[optuna.trial.FrozenTrial],
+    direction: str,
+) -> optuna.study.Study:
+    study = optuna.create_study(direction=direction)
+    for trial in trials:
+        study.add_trial(trial)
+    return study
+
+
+def _strip_window_index(params: dict[str, Any]) -> dict[str, Any]:
+    return {key: value for key, value in params.items() if key != "window_index"}
