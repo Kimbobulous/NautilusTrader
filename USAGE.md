@@ -71,6 +71,16 @@ uv run python -m mgc_bt backtest --force
 
 Without `--force`, the canonical timestamped run folder is still written, but `latest/` is left untouched.
 
+Strategy selection for normal backtests comes from `configs/settings.toml`:
+
+```toml
+[backtest]
+strategy = "mgc_production"
+strategy_class = ""
+```
+
+`strategy` is the common-case named registry selector. `strategy_class` is an advanced override using `package.module:ClassName`.
+
 ### Optimize
 
 Run optimization with the configured study:
@@ -99,6 +109,20 @@ uv run python -m mgc_bt optimize --force
 
 Without `--force`, the canonical timestamped optimization folder is still written, but `latest/` is left untouched.
 
+### Compare
+
+Run two strategies against the same bounded window:
+
+```powershell
+uv run python -m mgc_bt compare --strategy-a mgc_production --strategy-b mgc_production --instrument-id MGCJ1.GLBX --start-date 2021-03-09T00:00:00+00:00 --end-date 2021-03-10T23:59:00+00:00
+```
+
+Use an explicit import override for one side when you are testing an unregistered strategy:
+
+```powershell
+uv run python -m mgc_bt compare --strategy-a mgc_production --strategy-b scratch --strategy-class-b mypackage.strategies:MyStrategy --instrument-id MGCJ1.GLBX --start-date 2021-03-09T00:00:00+00:00 --end-date 2021-03-10T23:59:00+00:00
+```
+
 ## Output Layout
 
 ### Backtest
@@ -115,6 +139,8 @@ Files:
 - `equity_curve.png`
 - `run_config.toml`
 - `manifest.json`
+- `tearsheet.html`
+- `analytics/`
 
 ### Optimization
 
@@ -141,6 +167,54 @@ Files:
 - `holdout_results.json`
 - `holdout_equity_curve.png`
 - `manifest.json`
+
+### Comparison
+
+Comparison runs are written under:
+
+```text
+results/comparisons/YYYY-MM-DD_HHMMSS/
+```
+
+Files:
+- `comparison_summary.json`
+- `metrics_delta.csv`
+- `comparison_tearsheet.html`
+
+Each side of the comparison still gets its own normal timestamped folder under `results/backtests/`.
+
+## Add A Strategy
+
+Future strategies plug into the existing runner without editing runner or CLI code.
+
+1. Create a Nautilus-native strategy class and config class.
+   Example pattern:
+   - `MyStrategyConfig`
+   - `MyStrategy`
+2. Put reusable plumbing in the thin base where appropriate, but keep your signal engine inside the strategy module.
+3. Register the strategy in [strategy_registry.py](C:/dev/nautilustrader/src/mgc_bt/backtest/strategy_registry.py) by adding a new named entry.
+4. Select it in `configs/settings.toml`:
+
+```toml
+[backtest]
+strategy = "my_strategy"
+strategy_class = ""
+```
+
+5. For advanced local experiments, skip registry changes and use an explicit import override instead:
+
+```toml
+[backtest]
+strategy = "mgc_production"
+strategy_class = "mypackage.strategies:MyStrategy"
+```
+
+6. Run it with the normal commands:
+   - `uv run python -m mgc_bt backtest`
+   - `uv run python -m mgc_bt optimize`
+   - `uv run python -m mgc_bt compare --strategy-a mgc_production --strategy-b my_strategy ...`
+
+The important rule is that adding a strategy should require only a new class plus a registry entry, not runner or CLI edits.
 
 ## Rerun Best Parameters Manually
 

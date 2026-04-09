@@ -52,6 +52,7 @@ Priority order for v1.1 is:
 
 ### Phase 9: Reusable Strategy Platform
 
+**Status**: COMPLETE (2026-04-09)
 **Goal**: Refactor the platform for future strategy reuse and direct strategy-to-strategy comparison without changing current validated behavior.
 **Depends on**: Phase 8
 **Requirements**: PLT-01, PLT-02, PLT-03, PLT-04
@@ -69,4 +70,4 @@ Priority order for v1.1 is:
 
 ## Next Step
 
-Start with `/gsd-discuss-phase 9` to design the reusable strategy platform on top of the shipped research, analytics, and tearsheet layers.
+Run `/gsd-complete-milestone` when you're ready to archive v1.1.

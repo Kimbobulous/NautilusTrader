@@ -2,16 +2,16 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: milestone
-status: executing
-stopped_at: Phase 9 planning completed
-last_updated: "2026-04-09T18:00:09.874Z"
-last_activity: 2026-04-09 -- Phase 9 execution started
+status: ready_to_complete
+stopped_at: Phase 9 execution completed
+last_updated: "2026-04-09T18:12:00.000Z"
+last_activity: 2026-04-09 -- Phase 9 execution completed
 progress:
   total_phases: 4
-  completed_phases: 3
+  completed_phases: 4
   total_plans: 16
-  completed_plans: 12
-  percent: 75
+  completed_plans: 16
+  percent: 100
 ---
 
 # Project State
@@ -21,24 +21,24 @@ progress:
 See: .planning/PROJECT.md (updated 2026-04-08)
 
 **Core value:** Reliable MGC data ingestion and trustworthy event-driven backtests that make optimization results credible enough to act on.
-**Current focus:** Phase 9 — Reusable Strategy Platform
+**Current focus:** Milestone v1.1 closeout
 
 ## Current Position
 
-Phase: 9 (Reusable Strategy Platform) — EXECUTING
-Plan: 1 of 4
-Status: Executing Phase 9
-Last activity: 2026-04-09 -- Phase 9 execution started
+Phase: 9 (Reusable Strategy Platform) - COMPLETE
+Plan: 4 of 4
+Status: Ready to complete milestone v1.1
+Last activity: 2026-04-09 -- Phase 9 execution completed
 
-Progress: [########--] 75%
+Progress: [##########] 100%
 
 ## Performance Metrics
 
 **Velocity:**
 
-- Total plans completed: 12
+- Total plans completed: 16
 - Average duration: Phase 6 baseline established
-- Total execution time: Phases 6-7 executed in current milestone
+- Total execution time: Phases 6-9 executed in current milestone
 
 **By Phase:**
 
@@ -47,12 +47,12 @@ Progress: [########--] 75%
 | 6 | 4 | Completed | Baseline established |
 | 7 | 4 | Completed | Baseline extended |
 | 8 | 4 | Completed | Verified |
-| 9 | 4 | Planned | Next |
+| 9 | 4 | Completed | Reusable platform shipped |
 
 **Recent Trend:**
 
-- Last 5 plans: 08-04 completed, 09-01 through 09-04 planned
-- Trend: Phase 9 is fully planned and ready for execution
+- Last 5 plans: 08-04, 09-01, 09-02, 09-03, 09-04 completed
+- Trend: v1.1 implementation is complete and ready for milestone closeout
 
 ## Accumulated Context
 
@@ -87,6 +87,7 @@ Recent decisions affecting current work:
 - Phase 9: Strategy reuse must preserve current MGC behavior exactly; refactor only, no signal changes
 - Phase 9: Strategy selection should default to a named registry with optional import-path override
 - Phase 9: Comparison should be a dedicated CLI command with two normal run folders plus a lightweight comparison folder
+- Phase 9: The MGC golden fixture now locks exact traded output for the bounded 2021-03-09 to 2021-06-30 verification window
 
 ### Pending Todos
 
@@ -98,7 +99,6 @@ Recent decisions affecting current work:
 - Future catalog-touching work must preserve the decode split:
   - definitions use legacy Cython decoding
   - bars/trades use `as_legacy_cython=False`
-- v1.1 must not break the existing 47 passing tests or change current strategy behavior during indicator extraction
 - Phase 6: Keep the current `optimize` path intact by default; walk-forward, Monte Carlo, and stability analysis should extend it without replacing it
 - Phase 6: Final test evaluation must stay hidden unless explicitly requested
 - Phase 8 should consume the new Phase 7 `analytics/` filesystem contract instead of recomputing audit and breakdown data
@@ -107,6 +107,6 @@ Recent decisions affecting current work:
 
 ## Session Continuity
 
-Last session: 2026-04-09 22:45
-Stopped at: Phase 9 planning completed
-Resume file: .planning/phases/09-reusable-strategy-platform/09-01-PLAN.md
+Last session: 2026-04-09 23:12
+Stopped at: Phase 9 execution completed
+Resume file: .planning/phases/09-reusable-strategy-platform/09-VERIFICATION.md

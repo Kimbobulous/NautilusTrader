@@ -22,10 +22,10 @@
 
 ## Platform Reusability
 
-- [ ] **PLT-01**: User can implement future strategies by extending a generic strategy base class with minimal boilerplate.
-- [ ] **PLT-02**: User can reuse the current strategy indicators as a standardized standalone indicator library without changing existing strategy behavior.
-- [ ] **PLT-03**: User can switch which strategy runs through configuration rather than editing runner code.
-- [ ] **PLT-04**: User can compare two strategies on the same data and review their results side by side.
+- [x] **PLT-01**: User can implement future strategies by extending a generic strategy base class with minimal boilerplate.
+- [x] **PLT-02**: User can reuse the current strategy indicators as a standardized standalone indicator library without changing existing strategy behavior.
+- [x] **PLT-03**: User can switch which strategy runs through configuration rather than editing runner code.
+- [x] **PLT-04**: User can compare two strategies on the same data and review their results side by side.
 
 ## Future Requirements
 
