@@ -2,10 +2,10 @@
 gsd_state_version: 1.0
 milestone: v1.1
 milestone_name: quant research infrastructure
-status: roadmap_ready
-stopped_at: roadmap created
-last_updated: "2026-04-09T02:30:00.000Z"
-last_activity: 2026-04-08 - milestone v1.1 initialized and roadmap created
+status: phase_context_ready
+stopped_at: Phase 6 context gathered
+last_updated: "2026-04-08T22:45:00.000Z"
+last_activity: 2026-04-08 - Phase 6 context gathered, ready for planning
 progress:
   total_phases: 4
   completed_phases: 0
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-08)
 
 Phase: 6 - Research Integrity Framework
 Plan: Not started
-Status: Ready to discuss or plan Phase 6
-Last activity: 2026-04-08 - Milestone v1.1 initialized and roadmap created
+Status: Ready to plan Phase 6
+Last activity: 2026-04-08 - Phase 6 context gathered, ready for planning
 
 Progress: [----------] 0%
 
@@ -52,7 +52,7 @@ Progress: [----------] 0%
 **Recent Trend:**
 
 - Last 5 plans: None in v1.1 yet
-- Trend: Milestone initialized
+- Trend: Phase 6 context captured
 
 ## Accumulated Context
 
@@ -88,9 +88,11 @@ Recent decisions affecting current work:
   - definitions use legacy Cython decoding
   - bars/trades use `as_legacy_cython=False`
 - v1.1 must not break the existing 47 passing tests or change current strategy behavior during indicator extraction
+- Phase 6: Keep the current `optimize` path intact by default; walk-forward, Monte Carlo, and stability analysis should extend it without replacing it
+- Phase 6: Final test evaluation must stay hidden unless explicitly requested
 
 ## Session Continuity
 
-Last session: 2026-04-08 21:30
-Stopped at: roadmap created for v1.1
-Resume file: .planning/ROADMAP.md
+Last session: 2026-04-08 22:10
+Stopped at: Phase 6 context gathered
+Resume file: .planning/phases/06-research-integrity-framework/06-CONTEXT.md
