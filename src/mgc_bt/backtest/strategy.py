@@ -2,8 +2,11 @@ from __future__ import annotations
 
 from collections import defaultdict
 from collections import deque
+from datetime import UTC
+from datetime import datetime
 from decimal import Decimal
 from enum import Enum
+from pathlib import Path
 from typing import Any
 
 from nautilus_trader.config import StrategyConfig
@@ -24,9 +27,16 @@ from mgc_bt.backtest.indicators import FractalPivotTracker
 from mgc_bt.backtest.indicators import RollingMeanIndicator
 from mgc_bt.backtest.indicators import SessionVwapIndicator
 from mgc_bt.backtest.indicators import WaveTrendIndicator
+from mgc_bt.backtest.analytics import AuditLogWriter
+from mgc_bt.backtest.analytics import append_trade_metadata
+from mgc_bt.backtest.analytics import classify_session
+from mgc_bt.backtest.analytics import timestamp_from_ns
 from mgc_bt.backtest.risk import RiskManager
+from mgc_bt.backtest.state import ArmedAuditSnapshot
 from mgc_bt.backtest.state import BarSnapshot
+from mgc_bt.backtest.state import OpenTradeSnapshot
 from mgc_bt.backtest.state import PendingInsideBar
+from mgc_bt.backtest.state import PendingTradeContext
 from mgc_bt.backtest.state import StrategyDecision
 from mgc_bt.backtest.state import StrategyPhase
 from mgc_bt.backtest.state import StrategyRuntimeState
@@ -68,6 +78,8 @@ class MgcStrategyConfig(StrategyConfig, frozen=True):
     max_daily_loss_dollars: float
     max_consecutive_losses: int
     max_drawdown_pct: float
+    audit_log_path: str | None = None
+    trade_metadata_path: str | None = None
 
 
 class MgcSignalEngine:
@@ -102,6 +114,8 @@ class MgcSignalEngine:
         self._recent_bars: deque[BarSnapshot] = deque(maxlen=PINBAR_LOOKBACK + 3)
         self._bar_deltas: dict[int, float] = {}
         self._trade_buckets: dict[int, dict[str, float]] = defaultdict(lambda: {"buy": 0.0, "sell": 0.0})
+        self._audit_writer: AuditLogWriter | None = None
+        self._trade_metadata_path = Path(config.trade_metadata_path) if config.trade_metadata_path else None
 
     @property
     def is_ready(self) -> bool:
@@ -114,6 +128,16 @@ class MgcSignalEngine:
             and self.volume_mean.is_ready
             and self.range_mean.is_ready
         )
+
+    def start(self) -> None:
+        if self.config.audit_log_path:
+            self._audit_writer = AuditLogWriter(Path(self.config.audit_log_path))
+            self._audit_writer.open()
+
+    def stop(self) -> None:
+        if self._audit_writer is not None:
+            self._audit_writer.close()
+            self._audit_writer = None
 
     def on_trade_tick(self, tick: TradeTick) -> None:
         bucket = self._minute_bucket(tick.ts_event)
@@ -166,25 +190,71 @@ class MgcSignalEngine:
                 account_equity,
             )
 
+        self._record_armed_audit(
+            snapshot=snapshot,
+            trend_direction=trend_direction,
+            delta_value=delta_value,
+            prior_volume_avg=prior_volume_avg,
+            candle_confirmation=candle_confirmation,
+            decision=decision,
+        )
+
+        if self.state.open_trade_snapshot is not None:
+            self.state.open_trade_snapshot.update_excursions(snapshot.close)
+
         self._update_inside_bar_state(snapshot)
         self._recent_bars.append(snapshot)
         self._bar_index += 1
         return decision
 
-    def on_position_opened(self, side: PositionSide, avg_px_open: float) -> None:
+    def on_position_opened(self, event: PositionOpened | PositionSide, avg_px_open: float | None = None) -> None:
         self.state.position_open = True
         self.state.entry_pending = False
         self.state.exit_pending = False
         self.state.phase = StrategyPhase.IN_TRADE
+        if isinstance(event, PositionOpened):
+            side = event.side
+            avg_open = float(event.avg_px_open)
+        else:
+            side = event
+            avg_open = float(avg_px_open or 0.0)
         if side == PositionSide.LONG:
             self.state.position_direction = TradeDirection.LONG
         elif side == PositionSide.SHORT:
             self.state.position_direction = TradeDirection.SHORT
-        self.state.highest_close_since_entry = avg_px_open
-        self.state.lowest_close_since_entry = avg_px_open
+        self.state.highest_close_since_entry = avg_open
+        self.state.lowest_close_since_entry = avg_open
         self.state.current_trailing_stop = None
+        pending_context = self.state.pending_trade_context
+        if pending_context is not None:
+            self.state.open_trade_snapshot = OpenTradeSnapshot(
+                entry_timestamp=pending_context.timestamp,
+                entry_timestamp_ns=pending_context.timestamp_ns,
+                direction=pending_context.direction,
+                entry_price=avg_open,
+                entry_bar_index=pending_context.bar_index,
+                volatility_cluster=pending_context.volatility_cluster,
+                session=pending_context.session,
+                peak_close=avg_open,
+                trough_close=avg_open,
+            )
+        self.state.pending_trade_context = None
 
-    def on_position_closed(self) -> None:
+    def on_position_closed(self, event: PositionClosed) -> None:
+        open_trade_snapshot = self.state.open_trade_snapshot
+        if open_trade_snapshot is not None:
+            trade_row = open_trade_snapshot.to_metadata(
+                instrument_id=str(event.instrument_id),
+                exit_timestamp=timestamp_from_ns(int(event.ts_closed)),
+                exit_timestamp_ns=int(event.ts_closed),
+                exit_price=float(event.avg_px_close),
+                realized_pnl=float(event.realized_pnl.as_double()),
+                bars_held=max(self._bar_index - open_trade_snapshot.entry_bar_index, 0),
+            )
+            if self._audit_writer is not None:
+                self._audit_writer.write_trade(trade_row)
+            if self._trade_metadata_path is not None:
+                append_trade_metadata(self._trade_metadata_path, trade_row)
         self.state = StrategyRuntimeState(
             last_confirmed_swing_high=self.state.last_confirmed_swing_high,
             last_confirmed_swing_low=self.state.last_confirmed_swing_low,
@@ -196,9 +266,21 @@ class MgcSignalEngine:
         self.state.armed_direction = direction
         self.state.position_direction = direction
         self.state.entry_pending = True
+        if self._recent_bars:
+            latest = self._recent_bars[-1]
+            self.state.pending_trade_context = PendingTradeContext(
+                timestamp=timestamp_from_ns(latest.ts_event_ns),
+                timestamp_ns=latest.ts_event_ns,
+                direction=direction,
+                volatility_cluster=getattr(self.supertrend, "selected_cluster", None),
+                session=classify_session(datetime_from_ns(latest.ts_event_ns)),
+                bar_index=latest.index,
+            )
 
-    def exit_submitted(self) -> None:
+    def exit_submitted(self, reason: str | None = None) -> None:
         self.state.exit_pending = True
+        if self.state.open_trade_snapshot is not None:
+            self.state.open_trade_snapshot.exit_reason = reason
 
     def _evaluate_setup(
         self,
@@ -214,17 +296,17 @@ class MgcSignalEngine:
         if trend_direction is None:
             self.state.phase = StrategyPhase.FLAT
             self.state.armed_direction = None
-            return StrategyDecision()
+            return StrategyDecision(reason="trend_gate_failed")
 
         if not self._pullback_qualified(trend_direction, snapshot.index):
             self.state.phase = StrategyPhase.FLAT
             self.state.armed_direction = None
-            return StrategyDecision()
+            return StrategyDecision(reason="pullback_not_ready")
 
         self.state.phase = StrategyPhase.PULLBACK_ARMED
         self.state.armed_direction = trend_direction
         if not self._core_triggers_met(snapshot, trend_direction, delta_value, prior_volume_avg):
-            return StrategyDecision()
+            return StrategyDecision(reason="core_triggers_failed")
 
         if not self._has_optional_confirmation(
             snapshot=snapshot,
@@ -233,12 +315,12 @@ class MgcSignalEngine:
             prior_range_avg=prior_range_avg,
             candle_confirmation=candle_confirmation,
         ):
-            return StrategyDecision()
+            return StrategyDecision(reason="optional_confirmation_missing")
 
         if account_equity is not None and atr_value is not None:
             stop_distance = atr_value * self.config.atr_trail_multiplier
             if not self.risk.can_enter(trend_direction, stop_distance, account_equity):
-                return StrategyDecision()
+                return StrategyDecision(reason="risk_gate_blocked")
 
         return StrategyDecision(
             enter_direction=trend_direction,
@@ -287,6 +369,67 @@ class MgcSignalEngine:
             return TradeDirection.SHORT
         return None
 
+    def _record_armed_audit(
+        self,
+        *,
+        snapshot: BarSnapshot,
+        trend_direction: TradeDirection | None,
+        delta_value: float,
+        prior_volume_avg: float | None,
+        candle_confirmation: CandleConfirmation,
+        decision: StrategyDecision,
+    ) -> None:
+        if self._audit_writer is None or self.state.phase != StrategyPhase.PULLBACK_ARMED or trend_direction is None:
+            return
+        volume_avg = prior_volume_avg
+        volume_pass = volume_avg is not None and snapshot.volume > volume_avg
+        delta_threshold = self.config.delta_imbalance_threshold * snapshot.volume if snapshot.volume > 0 else 0.0
+        delta_pass = self._delta_pass(snapshot, trend_direction, delta_value)
+        absorption_detected = self._absorption_confirmed(
+            snapshot,
+            trend_direction,
+            prior_volume_avg,
+            self.range_mean.value,
+        )
+        optional_confirmation_count = self._optional_confirmation_count(
+            snapshot,
+            trend_direction,
+            prior_volume_avg,
+            self.range_mean.value,
+            candle_confirmation,
+        )
+        vwap_value = self.vwap.value
+        price_vs_vwap = "above" if vwap_value is not None and snapshot.close > vwap_value else "below" if vwap_value is not None and snapshot.close < vwap_value else "at"
+        audit_snapshot = ArmedAuditSnapshot(
+            timestamp=timestamp_from_ns(snapshot.ts_event_ns),
+            instrument_id=str(self.config.instrument_id),
+            open=snapshot.open,
+            high=snapshot.high,
+            low=snapshot.low,
+            close=snapshot.close,
+            volume=snapshot.volume,
+            supertrend_direction=self.supertrend.direction,
+            supertrend_value=self.supertrend.value,
+            volatility_cluster=getattr(self.supertrend, "selected_cluster", None),
+            vwap_value=vwap_value,
+            price_vs_vwap=price_vs_vwap,
+            wavetrend_zscore=self.wavetrend.zscore,
+            wavetrend_divergence_detected=bool(
+                self.wavetrend.bullish_divergence if trend_direction == TradeDirection.LONG else self.wavetrend.bearish_divergence,
+            ),
+            delta_value=delta_value,
+            delta_threshold=delta_threshold,
+            delta_pass=delta_pass,
+            volume_avg=volume_avg,
+            volume_pass=volume_pass,
+            absorption_detected=absorption_detected,
+            candle_formation=candle_confirmation.value,
+            optional_confirmation_count=optional_confirmation_count,
+            entry_fired=decision.enter_direction is not None,
+            entry_rejected_reason=None if decision.enter_direction is not None else decision.reason,
+        )
+        self._audit_writer.write_armed_bar(audit_snapshot)
+
     def _pullback_qualified(self, direction: TradeDirection, current_index: int) -> bool:
         if direction == TradeDirection.LONG and self.state.last_confirmed_swing_low is not None:
             return (current_index - self.state.last_confirmed_swing_low.index) >= self.config.min_pullback_bars
@@ -311,6 +454,15 @@ class MgcSignalEngine:
             return delta_value > 0 and snapshot.is_bullish
         return delta_value < 0 and snapshot.is_bearish
 
+    def _delta_pass(self, snapshot: BarSnapshot, direction: TradeDirection, delta_value: float) -> bool:
+        if snapshot.volume <= 0:
+            return False
+        if abs(delta_value) < (self.config.delta_imbalance_threshold * snapshot.volume):
+            return False
+        if direction == TradeDirection.LONG:
+            return delta_value > 0 and snapshot.is_bullish
+        return delta_value < 0 and snapshot.is_bearish
+
     def _has_optional_confirmation(
         self,
         snapshot: BarSnapshot,
@@ -326,6 +478,23 @@ class MgcSignalEngine:
                 self._wavetrend_confirmed(direction),
             ],
         )
+
+    def _optional_confirmation_count(
+        self,
+        snapshot: BarSnapshot,
+        direction: TradeDirection,
+        prior_volume_avg: float | None,
+        prior_range_avg: float | None,
+        candle_confirmation: CandleConfirmation,
+    ) -> int:
+        count = 0
+        if self._absorption_confirmed(snapshot, direction, prior_volume_avg, prior_range_avg):
+            count += 1
+        if candle_confirmation is not CandleConfirmation.NONE:
+            count += 1
+        if self._wavetrend_confirmed(direction):
+            count += 1
+        return count
 
     def _absorption_confirmed(
         self,
@@ -427,6 +596,7 @@ class MgcProductionStrategy(Strategy):
         self._engine = MgcSignalEngine(config)
 
     def on_start(self) -> None:
+        self._engine.start()
         instrument = self.cache.instrument(self.config.instrument_id)
         if instrument is None:
             self.log.error(f"Could not find instrument for {self.config.instrument_id}")
@@ -444,7 +614,7 @@ class MgcProductionStrategy(Strategy):
             return
         if decision.exit_trade and self._engine.state.position_open and not self._engine.state.exit_pending:
             self.close_all_positions(self.config.instrument_id)
-            self._engine.exit_submitted()
+            self._engine.exit_submitted(decision.reason)
             return
         if decision.enter_direction is None or self._engine.state.position_open or self._engine.state.entry_pending:
             return
@@ -464,13 +634,14 @@ class MgcProductionStrategy(Strategy):
         self._engine.entry_submitted(decision.enter_direction)
 
     def on_position_opened(self, event: PositionOpened) -> None:
-        self._engine.on_position_opened(event.side, float(event.avg_px_open))
+        self._engine.on_position_opened(event)
 
     def on_position_closed(self, event: PositionClosed) -> None:
-        self._engine.on_position_closed()
+        self._engine.on_position_closed(event)
 
     def on_stop(self) -> None:
         self.close_all_positions(self.config.instrument_id)
+        self._engine.stop()
 
     def _current_account_equity(self) -> float | None:
         account = self.portfolio.account(venue=self.config.instrument_id.venue)
@@ -483,3 +654,7 @@ class MgcProductionStrategy(Strategy):
         if balance_total is None:
             return None
         return float(balance_total.as_double())
+
+
+def datetime_from_ns(value: int):
+    return datetime.fromtimestamp(value / 1_000_000_000, tz=UTC)

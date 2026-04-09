@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from pathlib import Path
+import csv
 import json
 import shutil
+import sys
 from typing import Any, Iterable
 
-import pandas as pd
-
+from mgc_bt.backtest.analytics import BacktestAnalyticsBundle
+from mgc_bt.backtest.analytics import write_backtest_analytics
 from mgc_bt.backtest.plotting import save_equity_curve_png
 from mgc_bt.config import Settings
 
@@ -17,10 +19,11 @@ def write_backtest_artifacts(
     result: dict[str, Any],
     *,
     refresh_latest: bool = True,
+    run_dir: Path | None = None,
 ) -> dict[str, Path | None]:
     backtests_root = settings.paths.results_root / settings.backtest.results_subdir
     timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H%M%S")
-    run_dir = create_unique_timestamped_dir(backtests_root, timestamp)
+    run_dir = run_dir or create_unique_timestamped_dir(backtests_root, timestamp)
     latest_dir = backtests_root / "latest"
 
     summary_path = run_dir / "summary.json"
@@ -35,9 +38,16 @@ def write_backtest_artifacts(
         run_dir=run_dir,
     )
 
+    analytics_files: list[Path] = []
+    try:
+        analytics_bundle = write_backtest_analytics(result, run_dir)
+        analytics_files = analytics_bundle.files
+    except Exception as exc:
+        print(f"Warning: analytics generation failed for backtest run: {exc}", file=sys.stderr)
+
     write_manifest(
         run_dir,
-        [summary_path, trades_path, config_path, plot_path],
+        [summary_path, trades_path, config_path, plot_path, *analytics_files],
         latest_refreshed=refresh_latest,
     )
     refreshed_latest_dir = refresh_latest_dir(run_dir, refresh_latest=refresh_latest)
@@ -70,8 +80,7 @@ def persist_backtest_bundle(
 
     summary_path.write_text(json.dumps(backtest_summary_payload(result), indent=2), encoding="utf-8")
 
-    trades_frame = pd.DataFrame.from_records(result.get("trade_log", []))
-    trades_frame.to_csv(trades_path, index=False)
+    _write_csv(trades_path, result.get("trade_log", []))
 
     config_path.write_text(render_run_config_toml(settings, result), encoding="utf-8")
     save_equity_curve_png(result["equity_curve"], plot_path)
@@ -102,6 +111,15 @@ def backtest_summary_payload(result: dict[str, Any]) -> dict[str, Any]:
         "win_rate": result["win_rate"],
         "max_drawdown": result["max_drawdown"],
         "max_drawdown_pct": result.get("max_drawdown_pct"),
+        "max_drawdown_dollars": result.get("max_drawdown_dollars", result["max_drawdown"]),
+        "avg_drawdown_pct": result.get("avg_drawdown_pct"),
+        "avg_drawdown_dollars": result.get("avg_drawdown_dollars"),
+        "max_drawdown_duration_days": result.get("max_drawdown_duration_days"),
+        "avg_drawdown_duration_days": result.get("avg_drawdown_duration_days"),
+        "max_recovery_duration_days": result.get("max_recovery_duration_days"),
+        "avg_recovery_duration_days": result.get("avg_recovery_duration_days"),
+        "total_drawdown_episodes": result.get("total_drawdown_episodes"),
+        "pct_time_in_drawdown": result.get("pct_time_in_drawdown"),
         "total_trades": result["total_trades"],
         "parameters": result["parameters"],
         "strategy_parameters": result["parameters"],
@@ -231,3 +249,15 @@ def write_manifest(
         payload["latest_refreshed"] = latest_refreshed
     manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return manifest_path
+
+
+def _write_csv(path: Path, rows: list[dict[str, Any]]) -> None:
+    fieldnames = list(rows[0].keys()) if rows else []
+    with path.open("w", encoding="utf-8", newline="") as handle:
+        if not fieldnames:
+            handle.write("")
+            return
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)

@@ -24,6 +24,7 @@ from mgc_bt.optimization.results import write_monte_carlo_artifacts
 from mgc_bt.optimization.results import write_stability_artifacts
 from mgc_bt.optimization.results import write_walk_forward_artifacts
 from mgc_bt.optimization.results import write_optimization_manifest
+from mgc_bt.optimization.results import write_optimization_analytics
 from mgc_bt.optimization.results import write_failed_trials_json
 from mgc_bt.optimization.results import write_optimization_run_config
 from mgc_bt.optimization.results import write_optimization_summary_json
@@ -174,7 +175,7 @@ def run_optimization(
 
     best_trial = study.best_trial
     best_params = dict(best_trial.params)
-    in_sample_result = rerun_best_in_sample(settings, best_params)
+    in_sample_result = rerun_best_in_sample(settings, best_params, run_dir=(run_dir / "best_run").as_posix())
     holdout_result = rerun_holdout(settings, best_params)
     best_bundle = export_best_run(settings, run_dir, in_sample_result, holdout_result)
     top_10_outputs = export_top_10(
@@ -271,6 +272,16 @@ def run_optimization(
             },
         )
         stability_paths = write_stability_artifacts(run_dir, stability_result)
+    optimization_analytics_files = []
+    try:
+        optimization_analytics_files = write_optimization_analytics(
+            run_dir,
+            ranked_rows=ranked_rows,
+            best_run_result=in_sample_result,
+        )
+    except Exception as exc:
+        out.write(f"Warning: optimization analytics generation failed: {exc}\n")
+        out.flush()
     write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
     latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
     return {
@@ -298,6 +309,7 @@ def run_optimization(
         "monte_carlo_status": monte_carlo_status,
         "stability_summary_path": stability_paths["summary_path"] if stability_paths else None,
         "stability_status": stability_status,
+        "analytics_dir": run_dir / "analytics" if optimization_analytics_files else None,
     }
 
 
@@ -400,6 +412,23 @@ def _run_walk_forward_branch(
             },
         )
         stability_paths = write_stability_artifacts(run_dir, stability_result)
+    optimization_analytics_files = []
+    try:
+        if aggregate.selected_params:
+            best_window_result = next(
+                (item.test_result for item in window_results if not item.inconclusive and item.test_result is not None),
+                None,
+            )
+        else:
+            best_window_result = None
+        optimization_analytics_files = write_optimization_analytics(
+            run_dir,
+            ranked_rows=[],
+            best_run_result=best_window_result,
+        )
+    except Exception as exc:
+        output.write(f"Warning: optimization analytics generation failed: {exc}\n")
+        output.flush()
     _attach_phase_six_metadata(summary, analysis_flags, final_test_window)
     summary_path = write_optimization_summary_json(run_dir, summary)
     run_config_path = write_optimization_run_config(
@@ -433,6 +462,7 @@ def _run_walk_forward_branch(
         "monte_carlo_status": monte_carlo_status,
         "stability_summary_path": stability_paths["summary_path"] if stability_paths else None,
         "stability_status": stability_status,
+        "analytics_dir": run_dir / "analytics" if optimization_analytics_files else None,
     }
 
 

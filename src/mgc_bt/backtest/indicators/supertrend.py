@@ -17,6 +17,7 @@ class AdaptiveSuperTrendIndicator:
         self._supertrend: float | None = None
         self._prev_close: float | None = None
         self._selected_centroid: float | None = None
+        self._selected_cluster: int | None = None
         self._direction: int | None = None
 
     def update(self, bar: BarSnapshot) -> int | None:
@@ -30,7 +31,7 @@ class AdaptiveSuperTrendIndicator:
             self._prev_close = bar.close
             return None
 
-        self._selected_centroid = self._nearest_centroid(atr_value)
+        self._selected_centroid, self._selected_cluster = self._nearest_centroid(atr_value)
         band_distance = self._selected_centroid * self.factor
         hl2 = (bar.high + bar.low) / 2.0
         basic_upper = hl2 + band_distance
@@ -56,7 +57,7 @@ class AdaptiveSuperTrendIndicator:
         self._prev_close = bar.close
         return self._direction
 
-    def _nearest_centroid(self, atr_value: float) -> float:
+    def _nearest_centroid(self, atr_value: float) -> tuple[float, int]:
         values = list(self._atr_history)
         low = min(values)
         high = max(values)
@@ -75,7 +76,7 @@ class AdaptiveSuperTrendIndicator:
                 break
             centroids = next_centroids
         nearest_index = min(range(3), key=lambda item: abs(atr_value - centroids[item]))
-        return centroids[nearest_index]
+        return centroids[nearest_index], nearest_index + 1
 
     @property
     def direction(self) -> int | None:
@@ -88,6 +89,10 @@ class AdaptiveSuperTrendIndicator:
     @property
     def selected_centroid(self) -> float | None:
         return self._selected_centroid
+
+    @property
+    def selected_cluster(self) -> int | None:
+        return self._selected_cluster
 
     @property
     def is_ready(self) -> bool:

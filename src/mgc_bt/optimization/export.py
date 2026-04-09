@@ -12,7 +12,7 @@ from mgc_bt.optimization.results import write_holdout_files
 from mgc_bt.optimization.results import write_top_trial_bundle
 
 
-def rerun_best_in_sample(settings: Settings, best_params: dict[str, Any]) -> dict[str, Any]:
+def rerun_best_in_sample(settings: Settings, best_params: dict[str, Any], *, run_dir: str | None = None) -> dict[str, Any]:
     run_params = dict(best_params)
     run_params.update(
         {
@@ -21,6 +21,8 @@ def rerun_best_in_sample(settings: Settings, best_params: dict[str, Any]) -> dic
             "end_date": settings.optimization.in_sample_end,
         },
     )
+    if run_dir is not None:
+        run_params["_run_dir"] = run_dir
     return run_backtest(settings, run_params)
 
 

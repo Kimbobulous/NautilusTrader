@@ -127,8 +127,12 @@ def test_run_optimization_writes_ranked_results_and_holdout_exports(tmp_path, mo
     assert (run_dir / "best_run" / "summary.json").exists()
     assert (run_dir / "best_run" / "trades.csv").exists()
     assert (run_dir / "best_run" / "equity_curve.png").exists()
+    assert (run_dir / "best_run" / "analytics" / "audit_log.csv").exists()
+    assert (run_dir / "best_run" / "analytics" / "drawdown_episodes.csv").exists()
     assert (run_dir / "best_run" / "holdout_results.json").exists()
     assert (run_dir / "best_run" / "holdout_equity_curve.png").exists()
+    assert (run_dir / "analytics" / "parameter_sensitivity.csv").exists()
+    assert (run_dir / "analytics" / "breakdowns" / "by_session.csv").exists()
     assert (run_dir.parent / "latest" / "manifest.json").exists()
     assert (run_dir.parent / "latest" / "ranked_results.csv").exists()
     assert not (run_dir / "walk_forward").exists()
@@ -170,6 +174,7 @@ def test_run_optimization_writes_ranked_results_and_holdout_exports(tmp_path, mo
     manifest_payload = json.loads((run_dir / "manifest.json").read_text(encoding="utf-8"))
     assert "ranked_results.csv" in manifest_payload["files"]
     assert "optimization_summary.json" in manifest_payload["files"]
+    assert "analytics/parameter_sensitivity.csv" in manifest_payload["files"]
     summary_payload = json.loads((run_dir / "optimization_summary.json").read_text(encoding="utf-8"))
     assert "analysis_flags" not in summary_payload
 
@@ -232,6 +237,70 @@ def test_run_optimization_can_leave_latest_untouched(tmp_path, monkeypatch) -> N
     assert not (result["run_dir"].parent / "latest").exists()
     manifest_payload = json.loads((result["run_dir"] / "manifest.json").read_text(encoding="utf-8"))
     assert manifest_payload["latest_refreshed"] is False
+
+
+def test_run_optimization_warns_and_keeps_core_outputs_when_phase_seven_analytics_fail(tmp_path, monkeypatch, capsys) -> None:
+    settings = _temp_settings(tmp_path)
+
+    def fake_sample_trial_params(trial):
+        return {
+            "supertrend_atr_length": 5,
+            "supertrend_factor": 2.0,
+            "supertrend_training_period": 50,
+            "vwap_reset_hour_utc": 0,
+            "wavetrend_n1": 10,
+            "wavetrend_n2": 21,
+            "wavetrend_ob_level": 2.0,
+            "delta_imbalance_threshold": 0.3,
+            "absorption_volume_multiplier": 1.2,
+            "absorption_range_multiplier": 0.5,
+            "volume_lookback": 20,
+            "atr_trail_length": 14,
+            "atr_trail_multiplier": 2.0,
+            "min_pullback_bars": 2,
+            "max_loss_per_trade_dollars": 101.0,
+            "max_daily_loss_dollars": 301.0,
+            "max_consecutive_losses": 3,
+            "max_drawdown_pct": 5.0,
+        }
+
+    def fake_run_backtest(settings, params):
+        return {
+            "mode": "auto_roll",
+            "instrument_id": "AUTO_ROLL:MGC",
+            "segment_instruments": ["MGCJ1.GLBX"],
+            "segment_count": 1,
+            "start_date": params["start_date"],
+            "end_date": params["end_date"],
+            "total_pnl": 500.0,
+            "sharpe_ratio": 1.0,
+            "win_rate": 55.0,
+            "max_drawdown": 250.0,
+            "max_drawdown_pct": 10.0,
+            "total_trades": 50,
+            "parameters": params,
+            "segments": [],
+            "trade_log": [],
+            "equity_curve": [
+                {"timestamp": params["start_date"], "equity": 50000.0},
+                {"timestamp": params["end_date"], "equity": 50500.0},
+            ],
+        }
+
+    monkeypatch.setattr("mgc_bt.optimization.objective.sample_trial_params", fake_sample_trial_params)
+    monkeypatch.setattr("mgc_bt.optimization.objective.run_backtest", fake_run_backtest)
+    monkeypatch.setattr("mgc_bt.optimization.export.run_backtest", fake_run_backtest)
+    monkeypatch.setattr(
+        "mgc_bt.optimization.study.write_optimization_analytics",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("boom")),
+    )
+
+    result = run_optimization(settings, study_name="opt-fail-analytics", max_trials=1)
+    stdout = capsys.readouterr().out
+
+    assert (result["run_dir"] / "ranked_results.csv").exists()
+    assert (result["run_dir"] / "optimization_summary.json").exists()
+    assert "Warning: optimization analytics generation failed" in stdout
 
 
 def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -> None:
@@ -372,6 +441,8 @@ def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -
     assert (result["run_dir"] / "stability" / "top_pair_heatmap.csv").exists()
     assert (result["run_dir"] / "stability" / "neighborhood_robustness.json").exists()
     assert (result["run_dir"] / "stability" / "stability_summary.json").exists()
+    assert (result["run_dir"] / "analytics" / "parameter_sensitivity.csv").exists()
+    assert (result["run_dir"] / "analytics" / "breakdowns" / "by_session.csv").exists()
 
     summary_payload = json.loads((walk_root / "aggregated_summary.json").read_text(encoding="utf-8"))
     assert summary_payload["schema_version"] == 1

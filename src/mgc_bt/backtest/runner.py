@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+from pathlib import Path
 from typing import Any
 
 from nautilus_trader.backtest.node import BacktestNode
@@ -60,6 +61,9 @@ def run_backtest(settings: Settings, params: dict[str, Any] | None = None) -> di
         "max_consecutive_losses": raw_params.get("max_consecutive_losses", settings.risk.max_consecutive_losses),
         "max_drawdown_pct": raw_params.get("max_drawdown_pct", settings.risk.max_drawdown_pct),
     }
+    execution_params = dict(normalized_params)
+    if raw_params.get("_run_dir") is not None:
+        execution_params["_run_dir"] = raw_params["_run_dir"]
 
     starting_balance = settings.backtest.starting_balance
     segment_results = []
@@ -67,7 +71,7 @@ def run_backtest(settings: Settings, params: dict[str, Any] | None = None) -> di
         settings=settings,
         catalog=catalog,
         selection=selection,
-        params=normalized_params,
+        params=execution_params,
         starting_balance=starting_balance,
     ):
         node = BacktestNode(configs=[spec.run_config])
@@ -94,6 +98,7 @@ def run_backtest(settings: Settings, params: dict[str, Any] | None = None) -> di
             fills_report=fills_report,
             positions_report=positions_report,
             account_report=account_report,
+            trade_metadata_path=Path(str(spec.strategy_params["trade_metadata_path"])) if spec.strategy_params.get("trade_metadata_path") else None,
         )
         segment_results.append(segment_result)
         starting_balance = f"{segment_result.equity_curve[-1]['equity']:.2f} {settings.backtest.base_currency}"

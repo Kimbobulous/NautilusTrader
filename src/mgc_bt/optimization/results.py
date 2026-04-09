@@ -14,8 +14,11 @@ from mgc_bt.backtest.artifacts import persist_backtest_bundle
 from mgc_bt.backtest.artifacts import refresh_latest_dir
 from mgc_bt.backtest.artifacts import render_run_config_toml
 from mgc_bt.backtest.artifacts import write_manifest
+from mgc_bt.backtest.analytics import write_backtest_analytics
 from mgc_bt.backtest.plotting import save_equity_curve_png
 from mgc_bt.config import Settings
+from mgc_bt.optimization.analytics import write_optimization_trade_breakdowns
+from mgc_bt.optimization.analytics import write_parameter_sensitivity_csv
 from mgc_bt.optimization.search_space import optimized_param_names
 from mgc_bt.optimization.storage import optimization_root
 
@@ -173,7 +176,11 @@ def refresh_latest_results(run_dir: Path) -> Path:
 
 
 def write_best_run_bundle(settings: Settings, result: dict[str, Any], destination: Path) -> dict[str, Path]:
-    return persist_backtest_bundle(settings=settings, result=result, run_dir=destination)
+    outputs = persist_backtest_bundle(settings=settings, result=result, run_dir=destination)
+    write_backtest_analytics(result, destination)
+    files = [path for path in destination.rglob("*") if path.is_file() and path.name != "manifest.json"]
+    write_manifest(destination, files, latest_refreshed=None)
+    return outputs
 
 
 def write_top_trial_bundle(destination: Path, result: dict[str, Any]) -> dict[str, Path]:
@@ -208,6 +215,18 @@ def write_best_run_config(settings: Settings, result: dict[str, Any], destinatio
 def write_optimization_manifest(run_dir: Path, *, latest_refreshed: bool) -> Path:
     files = [path for path in run_dir.rglob("*") if path.is_file() and path.name != "manifest.json"]
     return write_manifest(run_dir, files, latest_refreshed=latest_refreshed)
+
+
+def write_optimization_analytics(
+    run_dir: Path,
+    *,
+    ranked_rows: list[dict[str, Any]],
+    best_run_result: dict[str, Any] | None,
+) -> list[Path]:
+    outputs = [write_parameter_sensitivity_csv(run_dir, ranked_rows)]
+    if best_run_result is not None:
+        outputs.extend(write_optimization_trade_breakdowns(run_dir, best_run_result.get("analytics_trade_log") or best_run_result.get("trade_log") or []))
+    return outputs
 
 
 def write_walk_forward_artifacts(

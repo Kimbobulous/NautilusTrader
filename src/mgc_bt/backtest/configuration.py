@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from pathlib import Path
 
 from nautilus_trader.backtest.config import ImportableFeeModelConfig
 from nautilus_trader.backtest.config import ImportableFillModelConfig
@@ -45,6 +46,14 @@ def build_segment_run_specs(
     trade_size = Decimal(str(params.get("trade_size", settings.backtest.trade_size)))
 
     for window in selection.windows:
+        analytics_root = None
+        if params.get("_run_dir"):
+            analytics_root = Path(str(params["_run_dir"])) / "analytics"
+        trade_metadata_path = None
+        audit_log_path = None
+        if analytics_root is not None:
+            trade_metadata_path = analytics_root / f"trade_metadata_{len(specs):02d}.jsonl"
+            audit_log_path = analytics_root / "audit_log.csv"
         strategy_params = {
             "instrument_id": InstrumentId.from_str(window.instrument_id),
             "bar_type": BarType.from_str(window.bar_type),
@@ -68,6 +77,8 @@ def build_segment_run_specs(
             "max_daily_loss_dollars": float(params.get("max_daily_loss_dollars", settings.risk.max_daily_loss_dollars)),
             "max_consecutive_losses": int(params.get("max_consecutive_losses", settings.risk.max_consecutive_losses)),
             "max_drawdown_pct": float(params.get("max_drawdown_pct", settings.risk.max_drawdown_pct)),
+            "audit_log_path": audit_log_path.as_posix() if audit_log_path is not None else None,
+            "trade_metadata_path": trade_metadata_path.as_posix() if trade_metadata_path is not None else None,
         }
         specs.append(
             SegmentRunSpec(

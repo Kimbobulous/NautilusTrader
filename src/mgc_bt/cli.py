@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+from datetime import UTC, datetime
 from pathlib import Path
 import sys
 from typing import Sequence
@@ -77,13 +78,18 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(render_ingest_cli_output(result))
             return 0
         if args.command == "backtest":
+            from mgc_bt.backtest.artifacts import create_unique_timestamped_dir
             from mgc_bt.backtest.artifacts import write_backtest_artifacts
             from mgc_bt.backtest.runner import run_backtest
 
+            backtests_root = settings.paths.results_root / settings.backtest.results_subdir
+            timestamp = datetime.now(tz=UTC).strftime("%Y-%m-%d_%H%M%S")
+            run_dir = create_unique_timestamped_dir(backtests_root, timestamp)
             params = {
                 "instrument_id": getattr(args, "instrument_id", None),
                 "start_date": getattr(args, "start_date", None),
                 "end_date": getattr(args, "end_date", None),
+                "_run_dir": run_dir.as_posix(),
             }
             report = preflight_backtest(settings, params)
             _raise_on_preflight_failures(report)
@@ -92,7 +98,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 settings,
                 params,
             )
-            artifact_paths = write_backtest_artifacts(settings, result, refresh_latest=bool(getattr(args, "force", False)))
+            artifact_paths = write_backtest_artifacts(
+                settings,
+                result,
+                refresh_latest=bool(getattr(args, "force", False)),
+                run_dir=run_dir,
+            )
             print(_render_backtest_summary(result, artifact_paths))
             return 0
         if args.command == "optimize":
