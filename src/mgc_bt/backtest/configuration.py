@@ -14,6 +14,7 @@ from nautilus_trader.common.config import LoggingConfig
 from nautilus_trader.config import ImportableStrategyConfig
 from nautilus_trader.model.data import Bar
 from nautilus_trader.model.data import BarType
+from nautilus_trader.model.data import TradeTick
 from nautilus_trader.model.identifiers import InstrumentId
 from nautilus_trader.persistence.catalog import ParquetDataCatalog
 
@@ -47,18 +48,38 @@ def build_segment_run_specs(
             "instrument_id": InstrumentId.from_str(window.instrument_id),
             "bar_type": BarType.from_str(window.bar_type),
             "trade_size": trade_size,
+            "supertrend_atr_length": int(params.get("supertrend_atr_length", settings.backtest.supertrend_atr_length)),
+            "supertrend_factor": float(params.get("supertrend_factor", settings.backtest.supertrend_factor)),
+            "supertrend_training_period": int(params.get("supertrend_training_period", settings.backtest.supertrend_training_period)),
+            "vwap_reset_hour_utc": int(params.get("vwap_reset_hour_utc", settings.backtest.vwap_reset_hour_utc)),
+            "wavetrend_n1": int(params.get("wavetrend_n1", settings.backtest.wavetrend_n1)),
+            "wavetrend_n2": int(params.get("wavetrend_n2", settings.backtest.wavetrend_n2)),
+            "wavetrend_ob_level": float(params.get("wavetrend_ob_level", settings.backtest.wavetrend_ob_level)),
+            "delta_imbalance_threshold": float(params.get("delta_imbalance_threshold", settings.backtest.delta_imbalance_threshold)),
+            "absorption_volume_multiplier": float(params.get("absorption_volume_multiplier", settings.backtest.absorption_volume_multiplier)),
+            "absorption_range_multiplier": float(params.get("absorption_range_multiplier", settings.backtest.absorption_range_multiplier)),
+            "volume_lookback": int(params.get("volume_lookback", settings.backtest.volume_lookback)),
+            "atr_trail_length": int(params.get("atr_trail_length", settings.backtest.atr_trail_length)),
+            "atr_trail_multiplier": float(params.get("atr_trail_multiplier", settings.backtest.atr_trail_multiplier)),
+            "min_pullback_bars": int(params.get("min_pullback_bars", settings.backtest.min_pullback_bars)),
         }
         specs.append(
             SegmentRunSpec(
                 run_config=BacktestRunConfig(
                     venues=[build_venue_config(settings, starting_balance=effective_starting_balance)],
-                    data=[build_bar_data_config(settings, window)],
+                    data=[
+                        build_bar_data_config(settings, window),
+                        build_trade_data_config(settings, window),
+                    ],
                     engine=BacktestEngineConfig(
                         logging=LoggingConfig(log_level="ERROR"),
                         strategies=[
                             ImportableStrategyConfig(
-                                strategy_path="mgc_bt.backtest.strategy_stub:Phase2HarnessStrategy",
-                                config_path="mgc_bt.backtest.strategy_stub:Phase2HarnessConfig",
+                                # Catalog continuity reminder:
+                                # definitions were ingested with legacy Cython decoding,
+                                # while bars and trades were ingested with as_legacy_cython=False.
+                                strategy_path="mgc_bt.backtest.strategy:MgcProductionStrategy",
+                                config_path="mgc_bt.backtest.strategy:MgcStrategyConfig",
                                 config=strategy_params,
                             ),
                         ],
@@ -110,6 +131,16 @@ def build_bar_data_config(settings: Settings, window: ContractWindow) -> Backtes
     return BacktestDataConfig(
         catalog_path=str(settings.paths.catalog_root),
         data_cls=Bar,
+        instrument_id=InstrumentId.from_str(window.instrument_id),
+        start_time=window.start.isoformat(),
+        end_time=window.end.isoformat(),
+    )
+
+
+def build_trade_data_config(settings: Settings, window: ContractWindow) -> BacktestDataConfig:
+    return BacktestDataConfig(
+        catalog_path=str(settings.paths.catalog_root),
+        data_cls=TradeTick,
         instrument_id=InstrumentId.from_str(window.instrument_id),
         start_time=window.start.isoformat(),
         end_time=window.end.isoformat(),

@@ -38,6 +38,20 @@ def run_backtest(settings: Settings, params: dict[str, Any] | None = None) -> di
         "end_date": _optional_text(raw_params.get("end_date")) or settings.backtest.end_date,
         "trade_size": raw_params.get("trade_size", settings.backtest.trade_size),
         "roll_source": selection.roll_source,
+        "supertrend_atr_length": raw_params.get("supertrend_atr_length", settings.backtest.supertrend_atr_length),
+        "supertrend_factor": raw_params.get("supertrend_factor", settings.backtest.supertrend_factor),
+        "supertrend_training_period": raw_params.get("supertrend_training_period", settings.backtest.supertrend_training_period),
+        "vwap_reset_hour_utc": raw_params.get("vwap_reset_hour_utc", settings.backtest.vwap_reset_hour_utc),
+        "wavetrend_n1": raw_params.get("wavetrend_n1", settings.backtest.wavetrend_n1),
+        "wavetrend_n2": raw_params.get("wavetrend_n2", settings.backtest.wavetrend_n2),
+        "wavetrend_ob_level": raw_params.get("wavetrend_ob_level", settings.backtest.wavetrend_ob_level),
+        "delta_imbalance_threshold": raw_params.get("delta_imbalance_threshold", settings.backtest.delta_imbalance_threshold),
+        "absorption_volume_multiplier": raw_params.get("absorption_volume_multiplier", settings.backtest.absorption_volume_multiplier),
+        "absorption_range_multiplier": raw_params.get("absorption_range_multiplier", settings.backtest.absorption_range_multiplier),
+        "volume_lookback": raw_params.get("volume_lookback", settings.backtest.volume_lookback),
+        "atr_trail_length": raw_params.get("atr_trail_length", settings.backtest.atr_trail_length),
+        "atr_trail_multiplier": raw_params.get("atr_trail_multiplier", settings.backtest.atr_trail_multiplier),
+        "min_pullback_bars": raw_params.get("min_pullback_bars", settings.backtest.min_pullback_bars),
     }
 
     starting_balance = settings.backtest.starting_balance
@@ -66,6 +80,8 @@ def run_backtest(settings: Settings, params: dict[str, Any] | None = None) -> di
         segment_result = build_segment_execution_result(
             result=results[0],
             instrument_id=spec.window.instrument_id,
+            start_date=spec.window.start.isoformat(),
+            end_date=spec.window.end.isoformat(),
             fills_report=fills_report,
             positions_report=positions_report,
             account_report=account_report,

@@ -26,6 +26,8 @@ def test_settings_loader_uses_expected_sections() -> None:
     assert settings.ingestion.bar_schema == "ohlcv-1m"
     assert settings.backtest.default_mode == "auto_roll"
     assert settings.backtest.calendar_roll_business_days == 5
+    assert settings.backtest.supertrend_atr_length == 10
+    assert settings.backtest.min_pullback_bars == 3
 
 
 def test_cli_errors_when_config_missing() -> None:

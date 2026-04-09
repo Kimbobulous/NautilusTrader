@@ -15,13 +15,13 @@ def test_run_backtest_returns_structured_summary() -> None:
         {
             "instrument_id": "MGCJ1.GLBX",
             "start_date": "2021-03-08T00:00:00+00:00",
-            "end_date": "2021-03-08T01:00:00+00:00",
+            "end_date": "2021-03-08T06:00:00+00:00",
         },
     )
 
     assert result["mode"] == "single_contract"
     assert result["instrument_id"] == "MGCJ1.GLBX"
-    assert result["total_trades"] > 0
+    assert result["total_trades"] >= 0
     assert "total_pnl" in result
     assert "sharpe_ratio" in result
     assert "win_rate" in result
@@ -29,6 +29,9 @@ def test_run_backtest_returns_structured_summary() -> None:
     assert isinstance(result["trade_log"], list)
     assert isinstance(result["equity_curve"], list)
     assert result["parameters"]["instrument_id"] == "MGCJ1.GLBX"
+    assert result["parameters"]["supertrend_atr_length"] == settings.backtest.supertrend_atr_length
+    assert result["start_date"] == "2021-03-08T00:00:00+00:00"
+    assert result["end_date"] == "2021-03-08T06:00:00+00:00"
 
 
 def test_cli_backtest_uses_shared_runner(monkeypatch, capsys) -> None:

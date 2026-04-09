@@ -12,7 +12,7 @@ This roadmap builds the system in dependency order: first establish a clean loca
 
 - [x] **Phase 1: Catalog Foundation** - Build the project skeleton, config system, CLI shell, and validated Databento catalog ingestion (completed 2026-04-08)
 - [x] **Phase 2: Backtest Runner** - Wire Nautilus backtest execution, venue assumptions, and reporting outputs (completed 2026-04-08)
-- [ ] **Phase 3: Strategy Logic** - Implement the MGC trend-following pullback strategy inside Nautilus event handlers
+- [x] **Phase 3: Strategy Logic** - Implement the MGC trend-following pullback strategy inside Nautilus event handlers (completed 2026-04-09)
 - [ ] **Phase 4: Optimization Workflow** - Add Optuna parameter search with ranked outputs and best-run artifacts
 - [ ] **Phase 5: Validation and Hardening** - Add regression checks, data validations, and operator-facing safeguards for reliable local use
 
@@ -62,10 +62,10 @@ Plans:
 **Plans**: 4 plans
 
 Plans:
-- [ ] 03-01: Implement strategy config and internal indicator/state model
-- [ ] 03-02: Implement trend and pullback qualification logic
-- [ ] 03-03: Implement entry-trigger confirmation logic
-- [ ] 03-04: Implement ATR trailing-stop exits and strategy reporting hooks
+- [x] 03-01: Implement strategy config and internal indicator/state model
+- [x] 03-02: Implement trend and pullback qualification logic
+- [x] 03-03: Implement entry-trigger confirmation logic
+- [x] 03-04: Implement ATR trailing-stop exits and strategy reporting hooks
 
 ### Phase 4: Optimization Workflow
 **Goal**: Deliver a repeatable Optuna workflow that tests parameter combinations, ranks results, and saves best-run artifacts.
@@ -107,6 +107,6 @@ Phases execute in numeric order: 1 -> 2 -> 3 -> 4 -> 5
 |-------|----------------|--------|-----------|
 | 1. Catalog Foundation | 3/3 | Complete    | 2026-04-08 |
 | 2. Backtest Runner | 3/3 | Complete    | 2026-04-08 |
-| 3. Strategy Logic | 0/4 | Not started | - |
+| 3. Strategy Logic | 4/4 | Complete    | 2026-04-09 |
 | 4. Optimization Workflow | 0/3 | Not started | - |
 | 5. Validation and Hardening | 0/3 | Not started | - |

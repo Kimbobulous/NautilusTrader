@@ -51,6 +51,20 @@ class BacktestConfig:
     end_date: str | None
     commission_per_side: float
     slippage_ticks: int
+    supertrend_atr_length: int
+    supertrend_factor: float
+    supertrend_training_period: int
+    vwap_reset_hour_utc: int
+    wavetrend_n1: int
+    wavetrend_n2: int
+    wavetrend_ob_level: float
+    delta_imbalance_threshold: float
+    absorption_volume_multiplier: float
+    absorption_range_multiplier: float
+    volume_lookback: int
+    atr_trail_length: int
+    atr_trail_multiplier: float
+    min_pullback_bars: int
 
 
 @dataclass(frozen=True)
@@ -130,6 +144,20 @@ def load_settings(config_path: str | Path) -> Settings:
             end_date=_optional_str(backtest.get("end_date")),
             commission_per_side=float(_require(backtest, "commission_per_side", "backtest")),
             slippage_ticks=int(_require(backtest, "slippage_ticks", "backtest")),
+            supertrend_atr_length=int(_require(backtest, "supertrend_atr_length", "backtest")),
+            supertrend_factor=float(_require(backtest, "supertrend_factor", "backtest")),
+            supertrend_training_period=int(_require(backtest, "supertrend_training_period", "backtest")),
+            vwap_reset_hour_utc=int(_require(backtest, "vwap_reset_hour_utc", "backtest")),
+            wavetrend_n1=int(_require(backtest, "wavetrend_n1", "backtest")),
+            wavetrend_n2=int(_require(backtest, "wavetrend_n2", "backtest")),
+            wavetrend_ob_level=float(_require(backtest, "wavetrend_ob_level", "backtest")),
+            delta_imbalance_threshold=float(_require(backtest, "delta_imbalance_threshold", "backtest")),
+            absorption_volume_multiplier=float(_require(backtest, "absorption_volume_multiplier", "backtest")),
+            absorption_range_multiplier=float(_require(backtest, "absorption_range_multiplier", "backtest")),
+            volume_lookback=int(_require(backtest, "volume_lookback", "backtest")),
+            atr_trail_length=int(_require(backtest, "atr_trail_length", "backtest")),
+            atr_trail_multiplier=float(_require(backtest, "atr_trail_multiplier", "backtest")),
+            min_pullback_bars=int(_require(backtest, "min_pullback_bars", "backtest")),
         ),
         optimization=OptimizationConfig(
             study_name=str(_require(optimization, "study_name", "optimization")),

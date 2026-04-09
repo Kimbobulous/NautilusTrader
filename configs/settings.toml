@@ -35,6 +35,20 @@ start_date = ""
 end_date = ""
 commission_per_side = 0.50
 slippage_ticks = 1
+supertrend_atr_length = 10
+supertrend_factor = 3.0
+supertrend_training_period = 100
+vwap_reset_hour_utc = 0
+wavetrend_n1 = 10
+wavetrend_n2 = 21
+wavetrend_ob_level = 2.0
+delta_imbalance_threshold = 0.3
+absorption_volume_multiplier = 1.5
+absorption_range_multiplier = 0.7
+volume_lookback = 20
+atr_trail_length = 14
+atr_trail_multiplier = 2.0
+min_pullback_bars = 3
 
 [optimization]
 study_name = "mgc-optuna"

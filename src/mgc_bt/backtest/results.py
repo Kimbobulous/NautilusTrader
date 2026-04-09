@@ -27,6 +27,8 @@ class SegmentExecutionResult:
 def build_segment_execution_result(
     result: BacktestResult,
     instrument_id: str,
+    start_date: str,
+    end_date: str,
     fills_report: pd.DataFrame,
     positions_report: pd.DataFrame,
     account_report: pd.DataFrame,
@@ -36,8 +38,8 @@ def build_segment_execution_result(
 
     return SegmentExecutionResult(
         instrument_id=instrument_id,
-        start_date=equity_frame.index.min().isoformat(),
-        end_date=equity_frame.index.max().isoformat(),
+        start_date=start_date,
+        end_date=end_date,
         total_pnl=_result_total_pnl(result),
         sharpe_ratio=_compute_sharpe_ratio(equity_frame),
         win_rate=_compute_win_rate(closed_positions),
