@@ -4,13 +4,22 @@ from mgc_bt.backtest.indicators import AdaptiveSuperTrendIndicator
 from mgc_bt.backtest.indicators import AtrIndicator
 from mgc_bt.backtest.indicators import SessionVwapIndicator
 from mgc_bt.backtest.indicators import WaveTrendIndicator
+from mgc_bt.backtest.strategy_primitives import AbsorptionDetector
+from mgc_bt.backtest.strategy_primitives import DeltaAccumulator
+from mgc_bt.backtest.strategy_primitives import inside_bar_breakout_direction
+from mgc_bt.backtest.strategy_primitives import pin_bar_direction
+from mgc_bt.backtest.strategy_primitives import shaved_bar_direction
 from mgc_bt.backtest.strategy import MIN_READY_BARS
 from mgc_bt.backtest.strategy import MgcSignalEngine
 from mgc_bt.backtest.strategy import MgcStrategyConfig
+from mgc_bt.backtest.state import PendingInsideBar
+from mgc_bt.backtest.state import TradeDirection
 from mgc_bt.backtest.state import BarSnapshot
+from nautilus_trader.model.enums import AggressorSide
 from nautilus_trader.model.data import BarType
 from nautilus_trader.model.identifiers import InstrumentId
 from decimal import Decimal
+from types import SimpleNamespace
 
 
 def test_atr_indicator_produces_positive_value_after_warmup() -> None:
@@ -66,6 +75,48 @@ def test_strategy_engine_is_not_ready_before_minimum_bars() -> None:
         engine.on_bar(_fake_runtime_bar(bar))
 
     assert not engine.is_ready
+
+
+def test_delta_accumulator_uses_prior_completed_bar_bucket() -> None:
+    accumulator = DeltaAccumulator()
+    accumulator.on_trade_tick(SimpleNamespace(ts_event=_bars(1)[0].ts_event_ns, size=4.0, aggressor_side=AggressorSide.BUYER))
+    accumulator.on_trade_tick(SimpleNamespace(ts_event=_bars(1)[0].ts_event_ns, size=1.0, aggressor_side=AggressorSide.SELLER))
+
+    next_bar_ts = _bars(2)[1].ts_event_ns
+    delta_value = accumulator.consume_completed_bar(next_bar_ts)
+
+    assert delta_value == 3.0
+    assert accumulator.bar_deltas[(next_bar_ts // 60_000_000_000) - 1] == 3.0
+
+
+def test_absorption_detector_is_reusable_outside_strategy_engine() -> None:
+    detector = AbsorptionDetector(volume_multiplier=1.5, range_multiplier=0.7)
+    snapshot = BarSnapshot(index=10, open=100.0, high=100.5, low=99.8, close=100.4, volume=200.0, ts_event_ns=1)
+
+    assert detector.confirmed(
+        snapshot=snapshot,
+        direction=TradeDirection.LONG,
+        prior_volume_avg=100.0,
+        prior_range_avg=2.0,
+    )
+
+
+def test_candle_primitive_helpers_detect_patterns() -> None:
+    prior = [
+        BarSnapshot(index=1, open=100.0, high=100.3, low=99.7, close=100.1, volume=100.0, ts_event_ns=1),
+        BarSnapshot(index=2, open=100.1, high=100.4, low=99.8, close=100.2, volume=100.0, ts_event_ns=2),
+        BarSnapshot(index=3, open=100.2, high=100.5, low=99.9, close=100.3, volume=100.0, ts_event_ns=3),
+        BarSnapshot(index=4, open=100.3, high=100.6, low=100.0, close=100.4, volume=100.0, ts_event_ns=4),
+        BarSnapshot(index=5, open=100.4, high=100.7, low=100.1, close=100.5, volume=100.0, ts_event_ns=5),
+        BarSnapshot(index=6, open=100.5, high=100.8, low=100.2, close=100.6, volume=100.0, ts_event_ns=6),
+    ]
+    pin_bar = BarSnapshot(index=7, open=100.7, high=100.9, low=99.4, close=100.8, volume=100.0, ts_event_ns=7)
+    shaved_bar = BarSnapshot(index=8, open=100.0, high=101.0, low=99.8, close=100.98, volume=100.0, ts_event_ns=8)
+    inside_break = BarSnapshot(index=11, open=100.0, high=101.2, low=99.9, close=101.1, volume=100.0, ts_event_ns=11)
+
+    assert pin_bar_direction(pin_bar, prior, 6) == TradeDirection.LONG
+    assert shaved_bar_direction(shaved_bar) == TradeDirection.LONG
+    assert inside_bar_breakout_direction(inside_break, PendingInsideBar(high=101.0, low=100.0, index=10)) == TradeDirection.LONG
 
 
 def _strategy_config() -> MgcStrategyConfig:

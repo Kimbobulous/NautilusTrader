@@ -1,25 +1,20 @@
 from __future__ import annotations
 
-from collections import defaultdict
 from collections import deque
 from datetime import UTC
 from datetime import datetime
 from decimal import Decimal
 from enum import Enum
 from pathlib import Path
-from typing import Any
 
 from nautilus_trader.config import StrategyConfig
 from nautilus_trader.model.data import Bar
 from nautilus_trader.model.data import BarType
 from nautilus_trader.model.data import TradeTick
-from nautilus_trader.model.enums import AggressorSide
-from nautilus_trader.model.enums import OrderSide
 from nautilus_trader.model.enums import PositionSide
 from nautilus_trader.model.events import PositionClosed
 from nautilus_trader.model.events import PositionOpened
 from nautilus_trader.model.identifiers import InstrumentId
-from nautilus_trader.trading.strategy import Strategy
 
 from mgc_bt.backtest.indicators import AdaptiveSuperTrendIndicator
 from mgc_bt.backtest.indicators import AtrIndicator
@@ -32,6 +27,14 @@ from mgc_bt.backtest.analytics import append_trade_metadata
 from mgc_bt.backtest.analytics import classify_session
 from mgc_bt.backtest.analytics import timestamp_from_ns
 from mgc_bt.backtest.risk import RiskManager
+from mgc_bt.backtest.strategy_base import BaseResearchStrategy
+from mgc_bt.backtest.strategy_primitives import AbsorptionDetector
+from mgc_bt.backtest.strategy_primitives import DeltaAccumulator
+from mgc_bt.backtest.strategy_primitives import delta_pass
+from mgc_bt.backtest.strategy_primitives import inside_bar_breakout_direction
+from mgc_bt.backtest.strategy_primitives import pin_bar_direction
+from mgc_bt.backtest.strategy_primitives import shaved_bar_direction
+from mgc_bt.backtest.strategy_primitives import volume_pass
 from mgc_bt.backtest.state import ArmedAuditSnapshot
 from mgc_bt.backtest.state import BarSnapshot
 from mgc_bt.backtest.state import OpenTradeSnapshot
@@ -112,8 +115,12 @@ class MgcSignalEngine:
         )
         self._bar_index = 0
         self._recent_bars: deque[BarSnapshot] = deque(maxlen=PINBAR_LOOKBACK + 3)
-        self._bar_deltas: dict[int, float] = {}
-        self._trade_buckets: dict[int, dict[str, float]] = defaultdict(lambda: {"buy": 0.0, "sell": 0.0})
+        self.delta_accumulator = DeltaAccumulator()
+        self._bar_deltas = self.delta_accumulator.bar_deltas
+        self.absorption_detector = AbsorptionDetector(
+            volume_multiplier=config.absorption_volume_multiplier,
+            range_multiplier=config.absorption_range_multiplier,
+        )
         self._audit_writer: AuditLogWriter | None = None
         self._trade_metadata_path = Path(config.trade_metadata_path) if config.trade_metadata_path else None
 
@@ -140,22 +147,13 @@ class MgcSignalEngine:
             self._audit_writer = None
 
     def on_trade_tick(self, tick: TradeTick) -> None:
-        bucket = self._minute_bucket(tick.ts_event)
-        size = float(tick.size)
-        if tick.aggressor_side == AggressorSide.BUYER:
-            self._trade_buckets[bucket]["buy"] += size
-        elif tick.aggressor_side == AggressorSide.SELLER:
-            self._trade_buckets[bucket]["sell"] += size
+        self.delta_accumulator.on_trade_tick(tick)
 
     def on_bar(self, bar: Bar, account_equity: float | None = None) -> StrategyDecision:
         snapshot = self._to_snapshot(bar)
         if account_equity is not None:
             self.risk._sync_session(snapshot.ts_event_ns, account_equity)
-        current_bucket = self._minute_bucket(snapshot.ts_event_ns)
-        completed_bucket = current_bucket - 1
-        bucket_data = self._trade_buckets.pop(completed_bucket, {"buy": 0.0, "sell": 0.0})
-        delta_value = bucket_data["buy"] - bucket_data["sell"]
-        self._bar_deltas[completed_bucket] = delta_value
+        delta_value = self.delta_accumulator.consume_completed_bar(snapshot.ts_event_ns)
 
         prior_volume_avg = self.volume_mean.value
         prior_range_avg = self.range_mean.value
@@ -383,9 +381,9 @@ class MgcSignalEngine:
         if self._audit_writer is None or self.state.phase != StrategyPhase.PULLBACK_ARMED or trend_direction is None:
             return
         volume_avg = prior_volume_avg
-        volume_pass = volume_avg is not None and snapshot.volume > volume_avg
+        volume_gate_pass = volume_pass(volume=snapshot.volume, prior_volume_avg=volume_avg)
         delta_threshold = self.config.delta_imbalance_threshold * snapshot.volume if snapshot.volume > 0 else 0.0
-        delta_pass = self._delta_pass(snapshot, trend_direction, delta_value)
+        delta_gate_pass = self._delta_pass(snapshot, trend_direction, delta_value)
         absorption_detected = self._absorption_confirmed(
             snapshot,
             trend_direction,
@@ -420,9 +418,9 @@ class MgcSignalEngine:
             ),
             delta_value=delta_value,
             delta_threshold=delta_threshold,
-            delta_pass=delta_pass,
+            delta_pass=delta_gate_pass,
             volume_avg=volume_avg,
-            volume_pass=volume_pass,
+            volume_pass=volume_gate_pass,
             absorption_detected=absorption_detected,
             candle_formation=candle_confirmation.value,
             optional_confirmation_count=optional_confirmation_count,
@@ -445,24 +443,17 @@ class MgcSignalEngine:
         delta_value: float,
         prior_volume_avg: float | None,
     ) -> bool:
-        if prior_volume_avg is None or snapshot.volume <= prior_volume_avg:
+        if not volume_pass(volume=snapshot.volume, prior_volume_avg=prior_volume_avg):
             return False
-        if snapshot.volume <= 0:
-            return False
-        if abs(delta_value) < (self.config.delta_imbalance_threshold * snapshot.volume):
-            return False
-        if direction == TradeDirection.LONG:
-            return delta_value > 0 and snapshot.is_bullish
-        return delta_value < 0 and snapshot.is_bearish
+        return self._delta_pass(snapshot, direction, delta_value)
 
     def _delta_pass(self, snapshot: BarSnapshot, direction: TradeDirection, delta_value: float) -> bool:
-        if snapshot.volume <= 0:
-            return False
-        if abs(delta_value) < (self.config.delta_imbalance_threshold * snapshot.volume):
-            return False
-        if direction == TradeDirection.LONG:
-            return delta_value > 0 and snapshot.is_bullish
-        return delta_value < 0 and snapshot.is_bearish
+        return delta_pass(
+            snapshot=snapshot,
+            direction=direction,
+            delta_value=delta_value,
+            threshold_fraction=self.config.delta_imbalance_threshold,
+        )
 
     def _has_optional_confirmation(
         self,
@@ -504,16 +495,12 @@ class MgcSignalEngine:
         prior_volume_avg: float | None,
         prior_range_avg: float | None,
     ) -> bool:
-        if prior_volume_avg is None or prior_range_avg is None or snapshot.range <= 0:
-            return False
-        if snapshot.volume <= (prior_volume_avg * self.config.absorption_volume_multiplier):
-            return False
-        if snapshot.range >= (prior_range_avg * self.config.absorption_range_multiplier):
-            return False
-        close_location = (snapshot.close - snapshot.low) / snapshot.range
-        if direction == TradeDirection.LONG:
-            return close_location >= 0.6
-        return close_location <= 0.4
+        return self.absorption_detector.confirmed(
+            snapshot=snapshot,
+            direction=direction,
+            prior_volume_avg=prior_volume_avg,
+            prior_range_avg=prior_range_avg,
+        )
 
     def _wavetrend_confirmed(self, direction: TradeDirection) -> bool:
         if direction == TradeDirection.LONG:
@@ -534,39 +521,13 @@ class MgcSignalEngine:
         return CandleConfirmation.NONE
 
     def _pin_bar(self, snapshot: BarSnapshot) -> TradeDirection | None:
-        if snapshot.range <= 0 or len(self._recent_bars) < PINBAR_LOOKBACK:
-            return None
-        lower_wick = min(snapshot.open, snapshot.close) - snapshot.low
-        upper_wick = snapshot.high - max(snapshot.open, snapshot.close)
-        close_location = (snapshot.close - snapshot.low) / snapshot.range
-        prior_lows = [bar.low for bar in list(self._recent_bars)[-PINBAR_LOOKBACK:]]
-        prior_highs = [bar.high for bar in list(self._recent_bars)[-PINBAR_LOOKBACK:]]
-        if lower_wick >= (0.66 * snapshot.range) and close_location >= 0.66 and snapshot.low < min(prior_lows):
-            return TradeDirection.LONG
-        if upper_wick >= (0.66 * snapshot.range) and close_location <= 0.34 and snapshot.high > max(prior_highs):
-            return TradeDirection.SHORT
-        return None
+        return pin_bar_direction(snapshot, list(self._recent_bars), PINBAR_LOOKBACK)
 
     def _shaved_bar(self, snapshot: BarSnapshot) -> TradeDirection | None:
-        if snapshot.range <= 0:
-            return None
-        close_location = (snapshot.close - snapshot.low) / snapshot.range
-        if close_location >= 0.95:
-            return TradeDirection.LONG
-        if close_location <= 0.05:
-            return TradeDirection.SHORT
-        return None
+        return shaved_bar_direction(snapshot)
 
     def _inside_bar_breakout(self, snapshot: BarSnapshot) -> TradeDirection | None:
-        if self.state.pending_inside_bar is None:
-            return None
-        if snapshot.index != self.state.pending_inside_bar.index + 1:
-            return None
-        if snapshot.close > self.state.pending_inside_bar.high:
-            return TradeDirection.LONG
-        if snapshot.close < self.state.pending_inside_bar.low:
-            return TradeDirection.SHORT
-        return None
+        return inside_bar_breakout_direction(snapshot, self.state.pending_inside_bar)
 
     def _update_inside_bar_state(self, snapshot: BarSnapshot) -> None:
         if self._recent_bars:
@@ -575,9 +536,6 @@ class MgcSignalEngine:
                 self.state.pending_inside_bar = PendingInsideBar(high=snapshot.high, low=snapshot.low, index=snapshot.index)
                 return
         self.state.pending_inside_bar = None
-
-    def _minute_bucket(self, ts_event_ns: int) -> int:
-        return ts_event_ns // 60_000_000_000
 
     def _to_snapshot(self, bar: Bar) -> BarSnapshot:
         return BarSnapshot(
@@ -591,70 +549,9 @@ class MgcSignalEngine:
         )
 
 
-class MgcProductionStrategy(Strategy):
+class MgcProductionStrategy(BaseResearchStrategy):
     def __init__(self, config: MgcStrategyConfig):
-        super().__init__(config)
-        self._engine = MgcSignalEngine(config)
-
-    def on_start(self) -> None:
-        self._engine.start()
-        instrument = self.cache.instrument(self.config.instrument_id)
-        if instrument is None:
-            self.log.error(f"Could not find instrument for {self.config.instrument_id}")
-            self.stop()
-            return
-        self.subscribe_bars(self.config.bar_type)
-        self.subscribe_trade_ticks(self.config.instrument_id)
-
-    def on_trade_tick(self, tick: TradeTick) -> None:
-        self._engine.on_trade_tick(tick)
-
-    def on_bar(self, bar: Bar) -> None:
-        decision = self._engine.on_bar(bar, account_equity=self._current_account_equity())
-        if not decision.has_action:
-            return
-        if decision.exit_trade and self._engine.state.position_open and not self._engine.state.exit_pending:
-            self.close_all_positions(self.config.instrument_id)
-            self._engine.exit_submitted(decision.reason)
-            return
-        if decision.enter_direction is None or self._engine.state.position_open or self._engine.state.entry_pending:
-            return
-
-        side = OrderSide.BUY if decision.enter_direction == TradeDirection.LONG else OrderSide.SELL
-        instrument = self.cache.instrument(self.config.instrument_id)
-        if instrument is None:
-            self.log.error(f"Could not find instrument for {self.config.instrument_id}")
-            self.stop()
-            return
-        order = self.order_factory.market(
-            self.config.instrument_id,
-            side,
-            instrument.make_qty(self.config.trade_size),
-        )
-        self.submit_order(order)
-        self._engine.entry_submitted(decision.enter_direction)
-
-    def on_position_opened(self, event: PositionOpened) -> None:
-        self._engine.on_position_opened(event)
-
-    def on_position_closed(self, event: PositionClosed) -> None:
-        self._engine.on_position_closed(event)
-
-    def on_stop(self) -> None:
-        self.close_all_positions(self.config.instrument_id)
-        self._engine.stop()
-
-    def _current_account_equity(self) -> float | None:
-        account = self.portfolio.account(venue=self.config.instrument_id.venue)
-        if account is None:
-            account = self.cache.account_for_venue(venue=self.config.instrument_id.venue)
-        if account is None:
-            return None
-
-        balance_total = account.balance_total()
-        if balance_total is None:
-            return None
-        return float(balance_total.as_double())
+        super().__init__(config, MgcSignalEngine(config))
 
 
 def datetime_from_ns(value: int):
