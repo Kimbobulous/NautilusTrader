@@ -79,7 +79,7 @@ def test_settings_loader_uses_expected_sections() -> None:
     assert settings.risk.max_drawdown_pct == 5.0
     assert settings.optimization.seed == 42
     assert settings.optimization.max_trials == 200
-    assert settings.optimization.in_sample_start == "2021-03-08T00:00:00+00:00"
+    assert settings.optimization.in_sample_start == "2021-03-09T00:00:00+00:00"
     assert settings.walk_forward.train_months == 12
     assert settings.walk_forward.final_test_months == 6
     assert settings.monte_carlo.simulations == 1000

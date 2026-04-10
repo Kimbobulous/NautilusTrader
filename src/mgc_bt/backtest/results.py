@@ -265,7 +265,7 @@ def _combine_equity_curves(segments: list[SegmentExecutionResult]) -> pd.DataFra
     frame = pd.DataFrame.from_records(records)
     if frame.empty:
         raise RuntimeError("No equity curve records were produced by the backtest.")
-    frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True)
+    frame["timestamp"] = pd.to_datetime(frame["timestamp"], format="ISO8601", utc=True)
     frame = frame.drop_duplicates(subset=["timestamp", "equity"]).sort_values("timestamp")
     frame = frame.set_index("timestamp")
     return frame[["equity"]]
