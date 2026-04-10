@@ -150,6 +150,33 @@ def test_phase_six_defaults_load_from_project_settings() -> None:
     assert settings.monte_carlo.random_seed_offset == 10000
 
 
+def test_phase_ten_production_windows_match_locked_research_contract() -> None:
+    settings = load_settings("configs/settings.toml")
+
+    assert settings.optimization.in_sample_start == "2021-03-09T00:00:00+00:00"
+    assert settings.optimization.in_sample_end == "2024-12-31T23:59:00+00:00"
+    assert settings.optimization.holdout_start == "2025-01-01T00:00:00+00:00"
+    assert settings.optimization.holdout_end == "2025-12-31T23:59:00+00:00"
+    assert settings.walk_forward.final_test_months == 6
+
+
+def test_smoke_optimization_config_loads_with_locked_phase_ten_values() -> None:
+    settings = load_settings("configs/smoke_optimization.toml")
+
+    assert settings.optimization.study_name == "mgc-optuna-smoke"
+    assert settings.optimization.storage_filename == "optuna_storage_smoke.db"
+    assert settings.optimization.max_trials == 20
+    assert settings.optimization.in_sample_start == "2021-03-09T00:00:00+00:00"
+    assert settings.optimization.in_sample_end == "2024-12-31T23:59:00+00:00"
+    assert settings.optimization.holdout_start == "2025-01-01T00:00:00+00:00"
+    assert settings.optimization.holdout_end == "2025-12-31T23:59:00+00:00"
+    assert settings.walk_forward.train_months == 6
+    assert settings.walk_forward.validation_months == 1
+    assert settings.walk_forward.test_months == 1
+    assert settings.walk_forward.step_months == 1
+    assert settings.walk_forward.final_test_months == 6
+
+
 def test_phase_six_invalid_walk_forward_values_raise_config_error(tmp_path: Path) -> None:
     config_path = _write_settings_file(
         tmp_path / "settings.toml",

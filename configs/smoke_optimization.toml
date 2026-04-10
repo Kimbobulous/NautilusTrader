@@ -63,12 +63,12 @@ max_consecutive_losses = 4
 max_drawdown_pct = 5.0
 
 [optimization]
-study_name = "mgc-optuna"
+study_name = "mgc-optuna-smoke"
 direction = "maximize"
 results_subdir = "optimization"
-storage_filename = "optuna_storage.db"
+storage_filename = "optuna_storage_smoke.db"
 seed = 42
-max_trials = 200
+max_trials = 20
 max_runtime_seconds = 14400
 early_stop_window = 50
 early_stop_min_improvement = 0.05
@@ -78,10 +78,10 @@ holdout_start = "2025-01-01T00:00:00+00:00"
 holdout_end = "2025-12-31T23:59:00+00:00"
 
 [walk_forward]
-train_months = 12
-validation_months = 3
-test_months = 3
-step_months = 3
+train_months = 6
+validation_months = 1
+test_months = 1
+step_months = 1
 validation_top_n = 5
 min_training_bars = 50000
 min_test_trades = 10
