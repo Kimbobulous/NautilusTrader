@@ -15,7 +15,7 @@ def save_equity_curve_png(equity_curve: list[dict[str, object]], output_path: Pa
     if frame.empty:
         raise RuntimeError("Cannot plot an empty equity curve.")
 
-    frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True)
+    frame["timestamp"] = pd.to_datetime(frame["timestamp"], format="ISO8601", utc=True)
     frame["equity"] = frame["equity"].astype(float)
 
     figure, axis = plt.subplots(figsize=(12, 6))

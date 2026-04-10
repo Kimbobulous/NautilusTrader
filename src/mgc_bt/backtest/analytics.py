@@ -296,7 +296,7 @@ def compute_drawdown_analysis(equity_curve: list[dict[str, Any]]) -> dict[str, A
         return {"underwater_curve": [], "episodes": [], "summary": empty_summary}
 
     frame = pd.DataFrame.from_records(equity_curve)
-    frame["timestamp"] = pd.to_datetime(frame["timestamp"], utc=True)
+    frame["timestamp"] = pd.to_datetime(frame["timestamp"], format="ISO8601", utc=True)
     frame["running_peak"] = frame["equity"].cummax()
     frame["underwater_dollars"] = frame["equity"] - frame["running_peak"]
     peaks = frame["running_peak"].replace(0, pd.NA)
