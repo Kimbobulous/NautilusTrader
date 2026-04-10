@@ -2,14 +2,14 @@
 gsd_state_version: 1.0
 milestone: v1.2
 milestone_name: Strategy Validation and Live Research
-status: ready_to_plan
-stopped_at: Phase 10 discussion completed
-last_updated: "2026-04-09T00:00:00.000Z"
-last_activity: 2026-04-09 -- Phase 10 discussion captured
+status: executing
+stopped_at: Milestone v1.2 initialized
+last_updated: "2026-04-10T00:23:27.568Z"
+last_activity: 2026-04-10 -- Phase 10 planning complete
 progress:
   total_phases: 4
   completed_phases: 0
-  total_plans: 0
+  total_plans: 2
   completed_plans: 0
   percent: 0
 ---
@@ -27,8 +27,8 @@ See: .planning/PROJECT.md (updated 2026-04-09)
 
 Milestone: v1.2 - ACTIVE
 Phase: 10 (Full 5-Year Optimization Run) - NOT STARTED
-Status: Ready to plan Phase 10
-Last activity: 2026-04-09 -- Phase 10 discussion captured
+Status: Ready to execute
+Last activity: 2026-04-10 -- Phase 10 planning complete
 
 Progress: [----------] 0%
 
@@ -46,6 +46,7 @@ Progress: [----------] 0%
 All decisions logged in PROJECT.md Key Decisions table.
 
 Key standing decisions for v1.2:
+
 - Always use Nautilus native infrastructure; check `nt_docs/` first
 - Catalog decode split: definitions use legacy Cython, bars/trades use `as_legacy_cython=False`
 - Repeated in-process backtest runs retain a shared Nautilus log guard
