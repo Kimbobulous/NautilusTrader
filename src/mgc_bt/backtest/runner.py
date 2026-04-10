@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from copy import deepcopy
+import gc
 from pathlib import Path
 from typing import Any
 
@@ -67,48 +68,72 @@ def run_backtest(settings: Settings, params: dict[str, Any] | None = None) -> di
     if raw_params.get("_run_dir") is not None:
         execution_params["_run_dir"] = raw_params["_run_dir"]
 
-    starting_balance = settings.backtest.starting_balance
-    segment_results = []
-    for spec in build_segment_run_specs(
+    selection_mode = selection.mode
+    segment_specs = build_segment_run_specs(
         settings=settings,
         catalog=catalog,
         selection=selection,
         params=execution_params,
-        starting_balance=starting_balance,
-    ):
-        node = BacktestNode(configs=[spec.run_config])
-        results = node.run()
-        if not results:
-            raise BacktestError(f"No backtest result was returned for {spec.window.instrument_id}.")
+        starting_balance=settings.backtest.starting_balance,
+    )
+    del selection
+    del catalog
+    gc.collect()
 
-        engine = node.get_engine(spec.run_config.id)
-        if engine is None:
-            raise BacktestError(f"Backtest engine was not available for {spec.window.instrument_id}.")
+    starting_balance = settings.backtest.starting_balance
+    segment_results = []
+    for spec in segment_specs:
+        node: BacktestNode | None = None
+        results = None
+        engine = None
+        fills_report = None
+        positions_report = None
+        account_report = None
+        try:
+            node = BacktestNode(configs=[spec.run_config])
+            results = node.run()
+            if not results:
+                raise BacktestError(f"No backtest result was returned for {spec.window.instrument_id}.")
 
-        _retain_log_guard(node)
+            engine = node.get_engine(spec.run_config.id)
+            if engine is None:
+                raise BacktestError(f"Backtest engine was not available for {spec.window.instrument_id}.")
 
-        venue = Venue(settings.backtest.venue_name)
-        fills_report = engine.trader.generate_order_fills_report()
-        positions_report = engine.trader.generate_positions_report()
-        account_report = engine.trader.generate_account_report(venue=venue)
+            _retain_log_guard(node)
 
-        segment_result = build_segment_execution_result(
-            result=results[0],
-            instrument_id=spec.window.instrument_id,
-            start_date=spec.window.start.isoformat(),
-            end_date=spec.window.end.isoformat(),
-            fills_report=fills_report,
-            positions_report=positions_report,
-            account_report=account_report,
-            trade_metadata_path=Path(str(spec.strategy_params["trade_metadata_path"])) if spec.strategy_params.get("trade_metadata_path") else None,
-        )
-        segment_results.append(segment_result)
-        starting_balance = f"{segment_result.equity_curve[-1]['equity']:.2f} {settings.backtest.base_currency}"
+            venue = Venue(settings.backtest.venue_name)
+            fills_report = engine.trader.generate_order_fills_report()
+            positions_report = engine.trader.generate_positions_report()
+            account_report = engine.trader.generate_account_report(venue=venue)
 
-        node.dispose()
+            segment_result = build_segment_execution_result(
+                result=results[0],
+                instrument_id=spec.window.instrument_id,
+                start_date=spec.window.start.isoformat(),
+                end_date=spec.window.end.isoformat(),
+                fills_report=fills_report,
+                positions_report=positions_report,
+                account_report=account_report,
+                trade_metadata_path=Path(str(spec.strategy_params["trade_metadata_path"])) if spec.strategy_params.get("trade_metadata_path") else None,
+            )
+            segment_results.append(segment_result)
+            starting_balance = f"{segment_result.equity_curve[-1]['equity']:.2f} {settings.backtest.base_currency}"
+        finally:
+            if node is not None:
+                node.dispose()
+            del account_report
+            del positions_report
+            del fills_report
+            del engine
+            del results
+            del node
+            gc.collect()
+
+    del segment_specs
+    gc.collect()
 
     return aggregate_execution_results(
-        mode=selection.mode,
+        mode=selection_mode,
         symbol_root=settings.ingestion.symbol,
         parameters=normalized_params,
         segments=segment_results,

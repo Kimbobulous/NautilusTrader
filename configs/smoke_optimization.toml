@@ -78,7 +78,7 @@ holdout_start = "2025-01-01T00:00:00+00:00"
 holdout_end = "2025-12-31T23:59:00+00:00"
 
 [walk_forward]
-train_months = 24
+train_months = 12
 validation_months = 3
 test_months = 3
 step_months = 6
