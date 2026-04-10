@@ -402,27 +402,6 @@ def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -
                     test_total_trades=20,
                     test_bar_count=15000,
                     selected_params={"supertrend_factor": 2.5},
-                    test_result={
-                        "mode": "auto_roll",
-                        "instrument_id": "AUTO_ROLL:MGC",
-                        "segment_instruments": ["MGCJ1.GLBX"],
-                        "segment_count": 1,
-                        "start_date": "2022-04-01T00:00:00+00:00",
-                        "end_date": "2022-07-01T00:00:00+00:00",
-                        "total_pnl": 800.0,
-                        "sharpe_ratio": 0.9,
-                        "win_rate": 55.0,
-                        "max_drawdown": 250.0,
-                        "max_drawdown_pct": 10.0,
-                        "total_trades": 20,
-                        "parameters": {"supertrend_factor": 2.5},
-                        "segments": [],
-                        "trade_log": [],
-                        "equity_curve": [
-                            {"timestamp": "2022-04-01T00:00:00+00:00", "equity": 50000.0},
-                            {"timestamp": "2022-07-01T00:00:00+00:00", "equity": 50800.0},
-                        ],
-                    },
                 ),
                 WalkForwardWindowResult(
                     window_index=2,
@@ -446,27 +425,6 @@ def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -
                     test_total_trades=5,
                     test_bar_count=15000,
                     selected_params={"supertrend_factor": 2.0},
-                    test_result={
-                        "mode": "auto_roll",
-                        "instrument_id": "AUTO_ROLL:MGC",
-                        "segment_instruments": ["MGCQ1.GLBX"],
-                        "segment_count": 1,
-                        "start_date": "2022-07-01T00:00:00+00:00",
-                        "end_date": "2022-10-01T00:00:00+00:00",
-                        "total_pnl": 100.0,
-                        "sharpe_ratio": 0.2,
-                        "win_rate": 40.0,
-                        "max_drawdown": 300.0,
-                        "max_drawdown_pct": 12.0,
-                        "total_trades": 5,
-                        "parameters": {"supertrend_factor": 2.0},
-                        "segments": [],
-                        "trade_log": [],
-                        "equity_curve": [
-                            {"timestamp": "2022-07-01T00:00:00+00:00", "equity": 50800.0},
-                            {"timestamp": "2022-10-01T00:00:00+00:00", "equity": 50900.0},
-                        ],
-                    },
                 ),
             ],
             "aggregate": WalkForwardAggregateSummary(
@@ -490,6 +448,27 @@ def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -
                     {"realized_pnl": 60.0},
                 ],
             ),
+            "best_run_result": {
+                "mode": "auto_roll",
+                "instrument_id": "AUTO_ROLL:MGC",
+                "segment_instruments": ["MGCJ1.GLBX"],
+                "segment_count": 1,
+                "start_date": "2022-04-01T00:00:00+00:00",
+                "end_date": "2022-07-01T00:00:00+00:00",
+                "total_pnl": 800.0,
+                "sharpe_ratio": 0.9,
+                "win_rate": 55.0,
+                "max_drawdown": 250.0,
+                "max_drawdown_pct": 10.0,
+                "total_trades": 20,
+                "parameters": {"supertrend_factor": 2.5},
+                "segments": [],
+                "trade_log": [],
+                "equity_curve": [
+                    {"timestamp": "2022-04-01T00:00:00+00:00", "equity": 50000.0},
+                    {"timestamp": "2022-07-01T00:00:00+00:00", "equity": 50800.0},
+                ],
+            },
         },
     )
 
@@ -512,6 +491,7 @@ def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -
     assert (result["run_dir"] / "analytics" / "breakdowns" / "by_session.csv").exists()
     assert (result["run_dir"] / "best_run" / "summary.json").exists()
     assert (result["run_dir"] / "tearsheet.html").exists()
+    assert not (result["run_dir"] / "_walk_forward_tmp").exists()
 
     summary_payload = json.loads((walk_root / "aggregated_summary.json").read_text(encoding="utf-8"))
     assert summary_payload["schema_version"] == 1

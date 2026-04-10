@@ -4,11 +4,17 @@ from dataclasses import dataclass
 from dataclasses import field
 from datetime import UTC
 from datetime import datetime
+import gc
+import json
+import os
+from pathlib import Path
 from typing import Any, TextIO
 
 import optuna
 from pandas import DateOffset
 from pandas import Timestamp
+import pyarrow.parquet as pq
+from nautilus_trader.model.data import Bar
 from nautilus_trader.persistence.catalog import ParquetDataCatalog
 
 from mgc_bt.backtest.contracts import resolve_contract_selection
@@ -51,7 +57,6 @@ class WalkForwardWindowResult:
     test_total_trades: int
     test_bar_count: int
     selected_params: dict[str, Any]
-    test_result: dict[str, Any] | None
 
 
 @dataclass(frozen=True)
@@ -65,6 +70,13 @@ class WalkForwardAggregateSummary:
     selected_params: list[dict[str, Any]]
     status: str
     aggregated_trade_log: list[dict[str, Any]] = field(default_factory=list)
+
+
+@dataclass
+class _AggregateBuffers:
+    equity_curve: list[dict[str, Any]] = field(default_factory=list)
+    trade_log: list[dict[str, Any]] = field(default_factory=list)
+    best_run_result: dict[str, Any] | None = None
 
 
 def build_walk_forward_windows(settings: Settings) -> list[WalkForwardWindow]:
@@ -103,13 +115,17 @@ def run_walk_forward_optimization(
     max_trials: int,
     output: TextIO,
     final_test: bool,
+    temp_root: Path,
 ) -> dict[str, Any]:
     catalog = ParquetDataCatalog(str(settings.paths.catalog_root))
+    temp_root.mkdir(parents=True, exist_ok=True)
     windows = build_walk_forward_windows(settings)
     runtime_warning = _RuntimeWarningState()
     window_results: list[WalkForwardWindowResult] = []
     failed_trials: list[dict[str, Any]] = []
     training_trials: list[optuna.trial.FrozenTrial] = []
+    aggregate_buffers = _AggregateBuffers()
+    temp_result_paths: dict[int, Path] = {}
     cumulative_oos_pnl = 0.0
 
     for window in windows:
@@ -137,7 +153,6 @@ def run_walk_forward_optimization(
                 test_total_trades=0,
                 test_bar_count=0,
                 selected_params={},
-                test_result=None,
             )
             window_results.append(skipped)
             _write_window_progress(output, skipped, cumulative_oos_pnl)
@@ -201,7 +216,6 @@ def run_walk_forward_optimization(
                 test_total_trades=0,
                 test_bar_count=0,
                 selected_params={},
-                test_result=None,
             )
             window_results.append(skipped)
             _write_window_progress(output, skipped, cumulative_oos_pnl)
@@ -226,8 +240,11 @@ def run_walk_forward_optimization(
         test_bar_count = _count_window_bars(catalog, settings, window.test_start, window.test_end)
         inconclusive = int(test_result.get("total_trades", 0)) < settings.walk_forward.min_test_trades
         status = "inconclusive" if inconclusive else "completed"
+        temp_result_paths[window.index] = _write_window_temp_result(temp_root, window.index, test_result)
         if not inconclusive:
             cumulative_oos_pnl += float(test_result.get("total_pnl", 0.0))
+            if aggregate_buffers.best_run_result is None:
+                aggregate_buffers.best_run_result = _read_window_temp_result(temp_result_paths[window.index])
         result = WalkForwardWindowResult(
             window_index=window.index,
             train_start=window.train_start,
@@ -250,12 +267,18 @@ def run_walk_forward_optimization(
             test_total_trades=int(test_result.get("total_trades", 0)),
             test_bar_count=test_bar_count,
             selected_params=selected["params"],
-            test_result=test_result,
         )
         window_results.append(result)
         _write_window_progress(output, result, cumulative_oos_pnl)
+        del test_result
+        del study
+        del completed_trials
+        gc.collect()
 
-    aggregate = _aggregate_walk_forward(window_results)
+    del catalog
+    gc.collect()
+
+    aggregate = _aggregate_walk_forward(window_results, aggregate_buffers, temp_result_paths)
     final_test_result = None
     if final_test:
         final_test_result = _run_final_test(settings, window_results)
@@ -267,6 +290,9 @@ def run_walk_forward_optimization(
         "failed_trials": failed_trials,
         "final_test_result": final_test_result,
         "training_trials": training_trials,
+        "best_run_result": aggregate_buffers.best_run_result,
+        "temp_root": temp_root,
+        "temp_result_paths": temp_result_paths,
     }
 
 
@@ -318,8 +344,12 @@ def _select_validation_candidate(
     return candidates[0]
 
 
-def _aggregate_walk_forward(window_results: list[WalkForwardWindowResult]) -> WalkForwardAggregateSummary:
-    conclusive = [result for result in window_results if result.status == "completed" and result.test_result is not None]
+def _aggregate_walk_forward(
+    window_results: list[WalkForwardWindowResult],
+    buffers: _AggregateBuffers,
+    temp_result_paths: dict[int, Path],
+) -> WalkForwardAggregateSummary:
+    conclusive = [result for result in window_results if result.status == "completed"]
     weighted_total = sum(
         (result.test_sharpe or 0.0) * max(result.test_bar_count, 0)
         for result in conclusive
@@ -328,7 +358,6 @@ def _aggregate_walk_forward(window_results: list[WalkForwardWindowResult]) -> Wa
     weight_sum = sum(result.test_bar_count for result in conclusive if result.test_sharpe is not None)
     aggregated_sharpe = round(weighted_total / weight_sum, 6) if weight_sum > 0 else None
     aggregated_total_pnl = round(sum(result.test_total_pnl or 0.0 for result in conclusive), 4)
-    equity_curve = _concatenate_equity_curves([result.test_result for result in conclusive if result.test_result is not None])
     selected_params = [
         {
             "window_index": result.window_index,
@@ -341,20 +370,24 @@ def _aggregate_walk_forward(window_results: list[WalkForwardWindowResult]) -> Wa
     skipped_count = sum(1 for result in window_results if result.status == "skipped")
     inconclusive_count = sum(1 for result in window_results if result.status == "inconclusive")
     status = "completed" if completed_count > 0 else "no_conclusive_windows"
+    for result in conclusive:
+        temp_path = temp_result_paths.get(result.window_index)
+        if temp_path is None:
+            continue
+        temp_result = _read_window_temp_result(temp_path)
+        _extend_aggregated_equity_curve(buffers.equity_curve, temp_result.get("equity_curve", []))
+        buffers.trade_log.extend(temp_result.get("trade_log", []))
+
     return WalkForwardAggregateSummary(
         completed_window_count=completed_count,
         skipped_window_count=skipped_count,
         inconclusive_window_count=inconclusive_count,
         aggregated_oos_sharpe=aggregated_sharpe,
         aggregated_oos_total_pnl=aggregated_total_pnl,
-        aggregated_equity_curve=equity_curve,
+        aggregated_equity_curve=buffers.equity_curve or _empty_equity_curve(),
         selected_params=selected_params,
         status=status,
-        aggregated_trade_log=[
-            trade
-            for result in conclusive
-            for trade in (result.test_result or {}).get("trade_log", [])
-        ],
+        aggregated_trade_log=buffers.trade_log,
     )
 
 
@@ -392,29 +425,93 @@ def _count_window_bars(
     )
     total = 0
     for segment in selection.windows:
-        total += len(catalog.bars(bar_types=[segment.bar_type], start=segment.start, end=segment.end))
+        total += _count_bar_rows_from_metadata(catalog, segment.bar_type, segment.start, segment.end)
     return total
 
 
-def _concatenate_equity_curves(results: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    records: list[dict[str, Any]] = []
-    seen: set[tuple[str, float]] = set()
-    for result in results:
-        for point in result.get("equity_curve", []):
-            key = (str(point["timestamp"]), float(point["equity"]))
-            if key in seen:
-                continue
-            seen.add(key)
-            records.append({"timestamp": key[0], "equity": round(key[1], 4)})
-    records.sort(key=lambda item: item["timestamp"])
-    if records:
-        return records
+def _count_bar_rows_from_metadata(
+    catalog: ParquetDataCatalog,
+    bar_type: str,
+    start: datetime,
+    end: datetime,
+) -> int:
+    directory = catalog._make_path(Bar, identifier=bar_type)
+    total_rows = 0
+    requested_start_ns = int(start.timestamp() * 1_000_000_000)
+    requested_end_ns = int(end.timestamp() * 1_000_000_000)
+    for path in catalog.fs.glob(os.path.join(directory, "*.parquet")):
+        interval = _file_interval_ns(path)
+        if interval is None:
+            continue
+        file_start_ns, file_end_ns = interval
+        if file_end_ns < requested_start_ns or file_start_ns > requested_end_ns:
+            continue
+        total_rows += pq.ParquetFile(path, filesystem=catalog.fs).metadata.num_rows
+    return total_rows
+
+
+def _file_interval_ns(path: str) -> tuple[int, int] | None:
+    name = os.path.basename(path)
+    stem, suffix = os.path.splitext(name)
+    if suffix != ".parquet":
+        return None
+    try:
+        start_ns, end_ns = stem.split("-", maxsplit=1)
+    except ValueError:
+        return None
+    return int(start_ns), int(end_ns)
+
+
+def _extend_aggregated_equity_curve(
+    destination: list[dict[str, Any]],
+    points: list[dict[str, Any]],
+) -> None:
+    seen = {(str(item["timestamp"]), float(item["equity"])) for item in destination}
+    for point in points:
+        key = (str(point["timestamp"]), float(point["equity"]))
+        if key in seen:
+            continue
+        seen.add(key)
+        destination.append({"timestamp": key[0], "equity": round(key[1], 4)})
+    destination.sort(key=lambda item: item["timestamp"])
+
+
+def _empty_equity_curve() -> list[dict[str, Any]]:
     return [
         {
             "timestamp": datetime.now(tz=UTC).isoformat(),
             "equity": 0.0,
         },
     ]
+
+
+def _write_window_temp_result(temp_root: Path, window_index: int, result: dict[str, Any]) -> Path:
+    payload = {
+        "mode": result.get("mode"),
+        "instrument_id": result.get("instrument_id"),
+        "segment_instruments": result.get("segment_instruments", []),
+        "segment_count": result.get("segment_count"),
+        "start_date": result.get("start_date"),
+        "end_date": result.get("end_date"),
+        "total_pnl": result.get("total_pnl"),
+        "sharpe_ratio": result.get("sharpe_ratio"),
+        "win_rate": result.get("win_rate"),
+        "max_drawdown": result.get("max_drawdown"),
+        "max_drawdown_pct": result.get("max_drawdown_pct"),
+        "total_trades": result.get("total_trades"),
+        "parameters": result.get("parameters", {}),
+        "segments": result.get("segments", []),
+        "trade_log": result.get("trade_log", []),
+        "analytics_trade_log": result.get("analytics_trade_log", []),
+        "equity_curve": result.get("equity_curve", []),
+    }
+    path = temp_root / f"window_{window_index:02d}_result.json"
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return path
+
+
+def _read_window_temp_result(path: Path) -> dict[str, Any]:
+    return json.loads(path.read_text(encoding="utf-8"))
 
 
 def _write_window_progress(output: TextIO, result: WalkForwardWindowResult, cumulative_oos_pnl: float) -> None:

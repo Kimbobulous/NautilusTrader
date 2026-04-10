@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import math
+import shutil
 import sys
 import time
 from typing import Any, TextIO
@@ -350,6 +351,7 @@ def _run_walk_forward_branch(
     effective_max_trials = max_trials or settings.optimization.max_trials
     storage_path = optimization_storage_path(settings)
     run_dir = create_optimization_run_dir(settings)
+    temp_root = run_dir / "_walk_forward_tmp"
     started_at = time.perf_counter()
     walk_forward_run = run_walk_forward_optimization(
         settings,
@@ -357,6 +359,7 @@ def _run_walk_forward_branch(
         max_trials=effective_max_trials,
         output=output,
         final_test=final_test,
+        temp_root=temp_root,
     )
     aggregate = walk_forward_run["aggregate"]
     window_results = walk_forward_run["window_results"]
@@ -374,133 +377,130 @@ def _run_walk_forward_branch(
         "status": aggregate.status,
         "final_test_executed": walk_forward_run["final_test_result"] is not None,
     }
-    artifact_paths = write_walk_forward_artifacts(
-        run_dir,
-        walk_forward_summary,
-        [_window_result_row(item) for item in window_results],
-        final_test_result=walk_forward_run["final_test_result"],
-    )
-    write_failed_trials_json(run_dir, walk_forward_run["failed_trials"])
-    summary = {
-        "study_name": effective_study_name,
-        "seed": settings.optimization.seed,
-        "completed_trials": sum(item.training_completed_trials for item in window_results),
-        "failed_trials": len(walk_forward_run["failed_trials"]),
-        "runtime_seconds": round(time.perf_counter() - started_at, 4),
-        "storage_path": storage_path.as_posix(),
-        "best_params": aggregate.selected_params[-1] if aggregate.selected_params else {},
-        "best_value": aggregate.aggregated_oos_sharpe,
-        "walk_forward_summary_path": artifact_paths["summary_path"].as_posix(),
-        "walk_forward_window_results_path": artifact_paths["window_results_path"].as_posix(),
-        "walk_forward_counts": {
-            "completed": aggregate.completed_window_count,
-            "skipped": aggregate.skipped_window_count,
-            "inconclusive": aggregate.inconclusive_window_count,
-        },
-        "overfit_warning": False,
-    }
-    monte_carlo_paths = None
-    monte_carlo_status = _analysis_status(
-        enabled=analysis_flags["monte_carlo_enabled"],
-        skipped_by_flag=False,
-    )
-    if analysis_flags["monte_carlo_enabled"]:
-        monte_carlo_result = run_monte_carlo_analysis(
-            aggregate.aggregated_trade_log,
-            simulations=settings.monte_carlo.simulations,
-            seed=settings.optimization.seed + settings.monte_carlo.random_seed_offset,
-            percentiles=settings.monte_carlo.percentile_points,
-            confidence_level=settings.monte_carlo.confidence_level,
-        )
-        monte_carlo_paths = write_monte_carlo_artifacts(run_dir, monte_carlo_result)
-    stability_paths = None
-    stability_status = _analysis_status(
-        enabled=analysis_flags["stability_enabled"],
-        skipped_by_flag=False,
-    )
-    if analysis_flags["stability_enabled"]:
-        stability_result = run_stability_analysis(
-            settings=settings,
-            study=_study_from_trials(walk_forward_run.get("training_trials", []), settings.optimization.direction),
-            best_params=_strip_window_index(aggregate.selected_params[-1]) if aggregate.selected_params else {},
-            evaluation_context={
-                "mode": "walk_forward",
-                "windows": [
-                    {"start": item.test_start, "end": item.test_end}
-                    for item in window_results
-                    if item.status != "skipped"
-                ],
-                "min_test_trades": settings.walk_forward.min_test_trades,
-            },
-        )
-        stability_paths = write_stability_artifacts(run_dir, stability_result)
-    optimization_analytics_files = []
     try:
-        if aggregate.selected_params:
-            best_window_result = next(
-                (item.test_result for item in window_results if not item.inconclusive and item.test_result is not None),
-                None,
-            )
-        else:
-            best_window_result = None
-        optimization_analytics_files = write_optimization_analytics(
+        artifact_paths = write_walk_forward_artifacts(
             run_dir,
-            ranked_rows=[],
-            best_run_result=best_window_result,
+            walk_forward_summary,
+            [_window_result_row(item) for item in window_results],
+            final_test_result=walk_forward_run["final_test_result"],
         )
-    except Exception as exc:
-        output.write(f"Warning: optimization analytics generation failed: {exc}\n")
-        output.flush()
-    _attach_phase_six_metadata(summary, analysis_flags, final_test_window)
-    summary_path = write_optimization_summary_json(run_dir, summary)
-    run_config_path = write_optimization_run_config(
-        settings,
-        run_dir,
-        aggregate.selected_params[-1] if aggregate.selected_params else {},
-        analysis_flags=analysis_flags,
-        final_test_window=final_test_window,
-    )
-    best_run_dir = None
-    if best_window_result is not None:
-        best_run_dir = run_dir / "best_run"
-        write_best_run_bundle(settings, best_window_result, best_run_dir)
-    tearsheet_path = None
-    try:
-        tearsheet_path = write_optimization_tearsheet(run_dir)
-    except FileNotFoundError as exc:
-        output.write(f"Warning: tearsheet generation failed for optimization run: {exc}\n")
-        output.flush()
-    except Exception as exc:
-        output.write(f"Warning: tearsheet generation failed for optimization run: {exc}\n")
-        output.flush()
-    write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
-    latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
-    return {
-        "run_dir": run_dir,
-        "latest_dir": latest_dir,
-        "summary_path": summary_path,
-        "run_config_path": run_config_path,
-        "tearsheet_path": tearsheet_path,
-        "storage_path": storage_path,
-        "study_name": effective_study_name,
-        "seed": settings.optimization.seed,
-        "completed_trials": summary["completed_trials"],
-        "failed_trials": len(walk_forward_run["failed_trials"]),
-        "best_params": summary["best_params"],
-        "best_value": aggregate.aggregated_oos_sharpe,
-        "walk_forward_summary_path": artifact_paths["summary_path"],
-        "walk_forward_counts": summary["walk_forward_counts"],
-        "best_run_dir": best_run_dir,
-        "holdout_summary_path": artifact_paths.get("final_test_summary_path"),
-        "holdout_plot_path": artifact_paths.get("final_test_plot_path"),
-        "overfit_warning": False,
-        "analysis_flags": analysis_flags,
-        "monte_carlo_summary_path": monte_carlo_paths["summary_path"] if monte_carlo_paths else None,
-        "monte_carlo_status": monte_carlo_status,
-        "stability_summary_path": stability_paths["summary_path"] if stability_paths else None,
-        "stability_status": stability_status,
-        "analytics_dir": run_dir / "analytics" if optimization_analytics_files else None,
-    }
+        write_failed_trials_json(run_dir, walk_forward_run["failed_trials"])
+        summary = {
+            "study_name": effective_study_name,
+            "seed": settings.optimization.seed,
+            "completed_trials": sum(item.training_completed_trials for item in window_results),
+            "failed_trials": len(walk_forward_run["failed_trials"]),
+            "runtime_seconds": round(time.perf_counter() - started_at, 4),
+            "storage_path": storage_path.as_posix(),
+            "best_params": aggregate.selected_params[-1] if aggregate.selected_params else {},
+            "best_value": aggregate.aggregated_oos_sharpe,
+            "walk_forward_summary_path": artifact_paths["summary_path"].as_posix(),
+            "walk_forward_window_results_path": artifact_paths["window_results_path"].as_posix(),
+            "walk_forward_counts": {
+                "completed": aggregate.completed_window_count,
+                "skipped": aggregate.skipped_window_count,
+                "inconclusive": aggregate.inconclusive_window_count,
+            },
+            "overfit_warning": False,
+        }
+        monte_carlo_paths = None
+        monte_carlo_status = _analysis_status(
+            enabled=analysis_flags["monte_carlo_enabled"],
+            skipped_by_flag=False,
+        )
+        if analysis_flags["monte_carlo_enabled"]:
+            monte_carlo_result = run_monte_carlo_analysis(
+                aggregate.aggregated_trade_log,
+                simulations=settings.monte_carlo.simulations,
+                seed=settings.optimization.seed + settings.monte_carlo.random_seed_offset,
+                percentiles=settings.monte_carlo.percentile_points,
+                confidence_level=settings.monte_carlo.confidence_level,
+            )
+            monte_carlo_paths = write_monte_carlo_artifacts(run_dir, monte_carlo_result)
+        stability_paths = None
+        stability_status = _analysis_status(
+            enabled=analysis_flags["stability_enabled"],
+            skipped_by_flag=False,
+        )
+        if analysis_flags["stability_enabled"]:
+            stability_result = run_stability_analysis(
+                settings=settings,
+                study=_study_from_trials(walk_forward_run.get("training_trials", []), settings.optimization.direction),
+                best_params=_strip_window_index(aggregate.selected_params[-1]) if aggregate.selected_params else {},
+                evaluation_context={
+                    "mode": "walk_forward",
+                    "windows": [
+                        {"start": item.test_start, "end": item.test_end}
+                        for item in window_results
+                        if item.status != "skipped"
+                    ],
+                    "min_test_trades": settings.walk_forward.min_test_trades,
+                },
+            )
+            stability_paths = write_stability_artifacts(run_dir, stability_result)
+        optimization_analytics_files = []
+        best_window_result = walk_forward_run.get("best_run_result") if aggregate.selected_params else None
+        try:
+            optimization_analytics_files = write_optimization_analytics(
+                run_dir,
+                ranked_rows=[],
+                best_run_result=best_window_result,
+            )
+        except Exception as exc:
+            output.write(f"Warning: optimization analytics generation failed: {exc}\n")
+            output.flush()
+        _attach_phase_six_metadata(summary, analysis_flags, final_test_window)
+        summary_path = write_optimization_summary_json(run_dir, summary)
+        run_config_path = write_optimization_run_config(
+            settings,
+            run_dir,
+            aggregate.selected_params[-1] if aggregate.selected_params else {},
+            analysis_flags=analysis_flags,
+            final_test_window=final_test_window,
+        )
+        best_run_dir = None
+        if best_window_result is not None:
+            best_run_dir = run_dir / "best_run"
+            write_best_run_bundle(settings, best_window_result, best_run_dir)
+        tearsheet_path = None
+        try:
+            tearsheet_path = write_optimization_tearsheet(run_dir)
+        except FileNotFoundError as exc:
+            output.write(f"Warning: tearsheet generation failed for optimization run: {exc}\n")
+            output.flush()
+        except Exception as exc:
+            output.write(f"Warning: tearsheet generation failed for optimization run: {exc}\n")
+            output.flush()
+        write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
+        latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
+        return {
+            "run_dir": run_dir,
+            "latest_dir": latest_dir,
+            "summary_path": summary_path,
+            "run_config_path": run_config_path,
+            "tearsheet_path": tearsheet_path,
+            "storage_path": storage_path,
+            "study_name": effective_study_name,
+            "seed": settings.optimization.seed,
+            "completed_trials": summary["completed_trials"],
+            "failed_trials": len(walk_forward_run["failed_trials"]),
+            "best_params": summary["best_params"],
+            "best_value": aggregate.aggregated_oos_sharpe,
+            "walk_forward_summary_path": artifact_paths["summary_path"],
+            "walk_forward_counts": summary["walk_forward_counts"],
+            "best_run_dir": best_run_dir,
+            "holdout_summary_path": artifact_paths.get("final_test_summary_path"),
+            "holdout_plot_path": artifact_paths.get("final_test_plot_path"),
+            "overfit_warning": False,
+            "analysis_flags": analysis_flags,
+            "monte_carlo_summary_path": monte_carlo_paths["summary_path"] if monte_carlo_paths else None,
+            "monte_carlo_status": monte_carlo_status,
+            "stability_summary_path": stability_paths["summary_path"] if stability_paths else None,
+            "stability_status": stability_status,
+            "analytics_dir": run_dir / "analytics" if optimization_analytics_files else None,
+        }
+    finally:
+        shutil.rmtree(temp_root, ignore_errors=True)
 
 
 def _progress_callback(runtime: OptimizationRuntime):
