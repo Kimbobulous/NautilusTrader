@@ -79,6 +79,7 @@ class RiskManager:
             self.current_session_date = session_date
             self.daily_trade_count = 0
             self.daily_pnl = 0.0
+            self.consecutive_losses = 0
             self.trading_halted_for_session = False
             self.session_start_equity = account_equity
             self.equity_peak = account_equity
