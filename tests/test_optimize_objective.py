@@ -41,7 +41,16 @@ def test_trial_evaluator_calls_shared_runner(monkeypatch) -> None:
     settings = load_settings("configs/settings.toml")
     captured: dict[str, object] = {}
 
-    def fake_run_backtest(passed_settings, params):
+    def fake_run_backtest_trial_subprocess(
+        passed_settings,
+        params,
+        *,
+        start_date,
+        end_date,
+        evaluation_window,
+        payload_path=None,
+        timeout_seconds=600,
+    ):
         captured["settings"] = passed_settings
         captured["params"] = params
         return {
@@ -56,7 +65,7 @@ def test_trial_evaluator_calls_shared_runner(monkeypatch) -> None:
             "instrument_id": "AUTO_ROLL:MGC",
         }
 
-    monkeypatch.setattr("mgc_bt.optimization.objective.run_backtest", fake_run_backtest)
+    monkeypatch.setattr("mgc_bt.optimization.objective.run_backtest_trial_subprocess", fake_run_backtest_trial_subprocess)
     evaluator = TrialEvaluator(settings)
 
     trial = optuna.trial.FixedTrial(
@@ -95,7 +104,16 @@ def test_evaluate_params_routes_walk_forward_windows_through_shared_runner(monke
     settings = load_settings("configs/settings.toml")
     captured: dict[str, object] = {}
 
-    def fake_run_backtest(passed_settings, params):
+    def fake_run_backtest_trial_subprocess(
+        passed_settings,
+        params,
+        *,
+        start_date,
+        end_date,
+        evaluation_window,
+        payload_path=None,
+        timeout_seconds=600,
+    ):
         captured["settings"] = passed_settings
         captured["params"] = params
         return {
@@ -112,7 +130,7 @@ def test_evaluate_params_routes_walk_forward_windows_through_shared_runner(monke
             "parameters": params,
         }
 
-    monkeypatch.setattr("mgc_bt.optimization.objective.run_backtest", fake_run_backtest)
+    monkeypatch.setattr("mgc_bt.optimization.objective.run_backtest_trial_subprocess", fake_run_backtest_trial_subprocess)
     result = evaluate_params(
         settings,
         {"supertrend_factor": 2.5},

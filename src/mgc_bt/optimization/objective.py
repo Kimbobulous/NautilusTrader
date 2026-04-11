@@ -1,15 +1,124 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import json
+import multiprocessing
+from pathlib import Path
+from queue import Empty
 from typing import Any
 
 import optuna
 
 from mgc_bt.backtest.runner import run_backtest
 from mgc_bt.config import Settings
+from mgc_bt.config import load_settings
 from mgc_bt.optimization.search_space import sample_trial_params
 
 OBJECTIVE_PENALTY = -10.0
+TRIAL_TIMEOUT_SECONDS = 600
+_SCALAR_RESULT_KEYS = (
+    "mode",
+    "instrument_id",
+    "segment_instruments",
+    "segment_count",
+    "start_date",
+    "end_date",
+    "total_pnl",
+    "sharpe_ratio",
+    "win_rate",
+    "max_drawdown",
+    "max_drawdown_pct",
+    "total_trades",
+)
+_PAYLOAD_RESULT_KEYS = (
+    "segments",
+    "trade_log",
+    "analytics_trade_log",
+    "equity_curve",
+)
+
+
+def _run_backtest_worker(
+    config_path: str,
+    params: dict[str, Any],
+    payload_path: str | None,
+    queue: multiprocessing.queues.Queue,
+) -> None:
+    try:
+        settings = load_settings(config_path)
+        result = run_backtest(settings, params)
+        payload = {key: result.get(key) for key in _PAYLOAD_RESULT_KEYS}
+        scalar_result = {key: result.get(key) for key in _SCALAR_RESULT_KEYS}
+        scalar_result["parameters"] = result.get("parameters", params)
+        if payload_path is not None:
+            payload_file = Path(payload_path)
+            payload_file.parent.mkdir(parents=True, exist_ok=True)
+            payload_file.write_text(json.dumps(payload), encoding="utf-8")
+            scalar_result["payload_path"] = payload_file.as_posix()
+        queue.put({"ok": True, "result": scalar_result})
+    except Exception as exc:  # pragma: no cover - exercised from parent process
+        queue.put({"ok": False, "error": f"{type(exc).__name__}: {exc}"})
+
+
+def run_backtest_trial_subprocess(
+    settings: Settings,
+    params: dict[str, Any],
+    *,
+    start_date: str,
+    end_date: str,
+    evaluation_window: str,
+    payload_path: Path | None = None,
+    timeout_seconds: int = TRIAL_TIMEOUT_SECONDS,
+) -> dict[str, Any]:
+    if payload_path is not None and payload_path.exists():
+        payload_path.unlink()
+
+    ctx = multiprocessing.get_context("spawn")
+    queue = ctx.Queue()
+    process = ctx.Process(
+        target=_run_backtest_worker,
+        args=(str(settings.config_path), params, payload_path.as_posix() if payload_path is not None else None, queue),
+    )
+    process.start()
+    process.join(timeout_seconds)
+
+    error: str | None = None
+    if process.is_alive():
+        process.terminate()
+        process.join(5)
+        error = f"TimeoutError: evaluation exceeded {timeout_seconds} seconds"
+    else:
+        try:
+            message = queue.get_nowait()
+        except Empty:
+            message = None
+        if message is None:
+            error = f"RuntimeError: evaluation process exited with code {process.exitcode}"
+        elif not message.get("ok", False):
+            error = str(message.get("error", "RuntimeError: unknown subprocess error"))
+        else:
+            result = dict(message["result"])
+            result["evaluation_window"] = evaluation_window
+            return result
+
+    return {
+        "mode": "evaluation_failed",
+        "instrument_id": None,
+        "segment_instruments": [],
+        "segment_count": 0,
+        "start_date": start_date,
+        "end_date": end_date,
+        "total_pnl": 0.0,
+        "sharpe_ratio": OBJECTIVE_PENALTY,
+        "win_rate": 0.0,
+        "max_drawdown": 0.0,
+        "max_drawdown_pct": 100.0,
+        "total_trades": 0,
+        "parameters": dict(params),
+        "evaluation_window": evaluation_window,
+        "error": error,
+        "payload_path": payload_path.as_posix() if payload_path is not None else None,
+    }
 
 
 def evaluate_params(
@@ -19,6 +128,7 @@ def evaluate_params(
     start_date: str,
     end_date: str,
     evaluation_window: str,
+    payload_path: Path | None = None,
 ) -> dict[str, Any]:
     run_params = dict(params)
     run_params.update(
@@ -28,7 +138,14 @@ def evaluate_params(
             "end_date": end_date,
         },
     )
-    result = run_backtest(settings, run_params)
+    result = run_backtest_trial_subprocess(
+        settings,
+        run_params,
+        start_date=start_date,
+        end_date=end_date,
+        evaluation_window=evaluation_window,
+        payload_path=payload_path,
+    )
     result.setdefault("parameters", run_params)
     result["evaluation_window"] = evaluation_window
     return result
@@ -77,17 +194,15 @@ class TrialEvaluator:
 
     def __call__(self, trial: optuna.trial.Trial) -> float:
         sampled_params = sample_trial_params(trial)
-        try:
-            result = evaluate_params(
-                self.settings,
-                sampled_params,
-                start_date=self.start_date or self.settings.optimization.in_sample_start,
-                end_date=self.end_date or self.settings.optimization.in_sample_end,
-                evaluation_window=self.evaluation_window,
-            )
-        except Exception as exc:
-            trial.set_user_attr("error", f"{type(exc).__name__}: {exc}")
-            raise
+        result = evaluate_params(
+            self.settings,
+            sampled_params,
+            start_date=self.start_date or self.settings.optimization.in_sample_start,
+            end_date=self.end_date or self.settings.optimization.in_sample_end,
+            evaluation_window=self.evaluation_window,
+        )
+        if result.get("error"):
+            trial.set_user_attr("error", result["error"])
 
         objective_score = compute_objective_score(result)
         apply_result_user_attrs(

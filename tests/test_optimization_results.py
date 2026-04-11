@@ -12,6 +12,7 @@ from mgc_bt.config import PathsConfig
 from mgc_bt.config import load_settings
 from mgc_bt.optimization.results import ranked_trial_rows
 from mgc_bt.optimization.study import run_optimization
+from mgc_bt.optimization.walk_forward import _file_interval_ns
 from mgc_bt.optimization.walk_forward import WalkForwardAggregateSummary
 from mgc_bt.optimization.walk_forward import WalkForwardWindowResult
 
@@ -39,6 +40,19 @@ def test_ranked_trial_rows_use_locked_tie_break_order() -> None:
     assert rows[0]["trial_number"] == 1
     assert rows[0]["rank"] == 1
     assert rows[1]["trial_number"] == 0
+
+
+def test_file_interval_ns_parses_catalog_filename_timestamps() -> None:
+    path = (
+        "catalog/data/bar/MGCJ1.GLBX-1-MINUTE-LAST-EXTERNAL/"
+        "2021-03-07T23-01-00-000000000Z_2021-04-27T15-31-00-000000000Z.parquet"
+    )
+    interval = _file_interval_ns(path)
+
+    assert interval is not None
+    start_ns, end_ns = interval
+    assert start_ns == 1615158060000000000
+    assert end_ns == 1619537460000000000
 
 
 def test_run_optimization_writes_ranked_results_and_holdout_exports(tmp_path, monkeypatch) -> None:
@@ -110,7 +124,10 @@ def test_run_optimization_writes_ranked_results_and_holdout_exports(tmp_path, mo
         }
 
     monkeypatch.setattr("mgc_bt.optimization.objective.sample_trial_params", fake_sample_trial_params)
-    monkeypatch.setattr("mgc_bt.optimization.objective.run_backtest", fake_run_backtest)
+    monkeypatch.setattr(
+        "mgc_bt.optimization.objective.run_backtest_trial_subprocess",
+        lambda settings, params, **kwargs: fake_run_backtest(settings, params),
+    )
     monkeypatch.setattr("mgc_bt.optimization.export.run_backtest", fake_run_backtest)
 
     result = run_optimization(settings, study_name="opt-test", max_trials=3)
@@ -231,7 +248,10 @@ def test_run_optimization_can_leave_latest_untouched(tmp_path, monkeypatch) -> N
         }
 
     monkeypatch.setattr("mgc_bt.optimization.objective.sample_trial_params", fake_sample_trial_params)
-    monkeypatch.setattr("mgc_bt.optimization.objective.run_backtest", fake_run_backtest)
+    monkeypatch.setattr(
+        "mgc_bt.optimization.objective.run_backtest_trial_subprocess",
+        lambda settings, params, **kwargs: fake_run_backtest(settings, params),
+    )
     monkeypatch.setattr("mgc_bt.optimization.export.run_backtest", fake_run_backtest)
 
     result = run_optimization(settings, study_name="opt-no-latest", max_trials=1, refresh_latest=False)
@@ -291,7 +311,10 @@ def test_run_optimization_warns_and_keeps_core_outputs_when_phase_seven_analytic
         }
 
     monkeypatch.setattr("mgc_bt.optimization.objective.sample_trial_params", fake_sample_trial_params)
-    monkeypatch.setattr("mgc_bt.optimization.objective.run_backtest", fake_run_backtest)
+    monkeypatch.setattr(
+        "mgc_bt.optimization.objective.run_backtest_trial_subprocess",
+        lambda settings, params, **kwargs: fake_run_backtest(settings, params),
+    )
     monkeypatch.setattr("mgc_bt.optimization.export.run_backtest", fake_run_backtest)
     monkeypatch.setattr(
         "mgc_bt.optimization.study.write_optimization_analytics",
@@ -355,7 +378,10 @@ def test_run_optimization_warns_and_keeps_core_outputs_when_tearsheet_fails(tmp_
         }
 
     monkeypatch.setattr("mgc_bt.optimization.objective.sample_trial_params", fake_sample_trial_params)
-    monkeypatch.setattr("mgc_bt.optimization.objective.run_backtest", fake_run_backtest)
+    monkeypatch.setattr(
+        "mgc_bt.optimization.objective.run_backtest_trial_subprocess",
+        lambda settings, params, **kwargs: fake_run_backtest(settings, params),
+    )
     monkeypatch.setattr("mgc_bt.optimization.export.run_backtest", fake_run_backtest)
     monkeypatch.setattr(
         "mgc_bt.optimization.study.write_optimization_tearsheet",

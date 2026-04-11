@@ -8,6 +8,7 @@ import gc
 import json
 import os
 from pathlib import Path
+import re
 from typing import Any, TextIO
 
 import optuna
@@ -230,21 +231,23 @@ def run_walk_forward_optimization(
             completed_trials,
             window=window,
         )
+        temp_path = temp_root / f"window_{window.index:02d}_result.json"
         test_result = evaluate_params(
             settings,
             selected["params"],
             start_date=window.test_start,
             end_date=window.test_end,
             evaluation_window="test",
+            payload_path=temp_path,
         )
         test_bar_count = _count_window_bars(catalog, settings, window.test_start, window.test_end)
         inconclusive = int(test_result.get("total_trades", 0)) < settings.walk_forward.min_test_trades
         status = "inconclusive" if inconclusive else "completed"
-        temp_result_paths[window.index] = _write_window_temp_result(temp_root, window.index, test_result)
+        temp_result_paths[window.index] = temp_path
         if not inconclusive:
             cumulative_oos_pnl += float(test_result.get("total_pnl", 0.0))
-            if aggregate_buffers.best_run_result is None:
-                aggregate_buffers.best_run_result = _read_window_temp_result(temp_result_paths[window.index])
+            if aggregate_buffers.best_run_result is None and temp_path.exists():
+                aggregate_buffers.best_run_result = _merge_payload_result(test_result, temp_path)
         result = WalkForwardWindowResult(
             window_index=window.index,
             train_start=window.train_start,
@@ -398,13 +401,18 @@ def _run_final_test(settings: Settings, window_results: list[WalkForwardWindowRe
     latest = selected_results[-1]
     final_end = Timestamp(settings.optimization.holdout_end, tz="UTC")
     final_start = final_end - DateOffset(months=settings.walk_forward.final_test_months)
-    return evaluate_params(
+    payload_path = settings.paths.results_root / "_temp" / "final_test_result.json"
+    result = evaluate_params(
         settings,
         latest.selected_params,
         start_date=final_start.isoformat(),
         end_date=final_end.isoformat(),
         evaluation_window="final_test",
+        payload_path=payload_path,
     )
+    if payload_path.exists():
+        return _merge_payload_result(result, payload_path)
+    return result
 
 
 def _count_window_bars(
@@ -455,11 +463,25 @@ def _file_interval_ns(path: str) -> tuple[int, int] | None:
     stem, suffix = os.path.splitext(name)
     if suffix != ".parquet":
         return None
-    try:
-        start_ns, end_ns = stem.split("-", maxsplit=1)
-    except ValueError:
+    parts = stem.split("_", maxsplit=1)
+    if len(parts) != 2:
         return None
-    return int(start_ns), int(end_ns)
+    start_text, end_text = parts
+    try:
+        start_ns = _catalog_timestamp_to_ns(start_text)
+        end_ns = _catalog_timestamp_to_ns(end_text)
+    except (TypeError, ValueError):
+        return None
+    return start_ns, end_ns
+
+
+def _catalog_timestamp_to_ns(value: str) -> int:
+    match = re.fullmatch(r"(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{9})Z", value)
+    if match is None:
+        raise ValueError(f"Unsupported catalog timestamp: {value}")
+    date_part, hour, minute, second, nanoseconds = match.groups()
+    iso_text = f"{date_part}T{hour}:{minute}:{second}.{nanoseconds}+00:00"
+    return int(Timestamp(iso_text, tz="UTC").value)
 
 
 def _extend_aggregated_equity_curve(
@@ -485,33 +507,15 @@ def _empty_equity_curve() -> list[dict[str, Any]]:
     ]
 
 
-def _write_window_temp_result(temp_root: Path, window_index: int, result: dict[str, Any]) -> Path:
-    payload = {
-        "mode": result.get("mode"),
-        "instrument_id": result.get("instrument_id"),
-        "segment_instruments": result.get("segment_instruments", []),
-        "segment_count": result.get("segment_count"),
-        "start_date": result.get("start_date"),
-        "end_date": result.get("end_date"),
-        "total_pnl": result.get("total_pnl"),
-        "sharpe_ratio": result.get("sharpe_ratio"),
-        "win_rate": result.get("win_rate"),
-        "max_drawdown": result.get("max_drawdown"),
-        "max_drawdown_pct": result.get("max_drawdown_pct"),
-        "total_trades": result.get("total_trades"),
-        "parameters": result.get("parameters", {}),
-        "segments": result.get("segments", []),
-        "trade_log": result.get("trade_log", []),
-        "analytics_trade_log": result.get("analytics_trade_log", []),
-        "equity_curve": result.get("equity_curve", []),
-    }
-    path = temp_root / f"window_{window_index:02d}_result.json"
-    path.write_text(json.dumps(payload), encoding="utf-8")
-    return path
-
-
 def _read_window_temp_result(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _merge_payload_result(result: dict[str, Any], path: Path) -> dict[str, Any]:
+    payload = _read_window_temp_result(path)
+    merged = dict(result)
+    merged.update(payload)
+    return merged
 
 
 def _write_window_progress(output: TextIO, result: WalkForwardWindowResult, cumulative_oos_pnl: float) -> None:
