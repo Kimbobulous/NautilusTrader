@@ -10,7 +10,7 @@
 
 ### Phase 10: Full 5-Year Optimization Run
 
-**Status**: NOT STARTED
+**Status**: REPLANNED - Plan 03 added, awaiting execution
 **Goal**: Run the complete 5-year MGC walk-forward optimization and produce the full research artifact bundle without changing infrastructure or strategy logic.
 **Depends on**: Phase 9
 **Requirements**: RES-01, RES-02
@@ -19,6 +19,11 @@
 2. The run produces a full tearsheet, Monte Carlo outputs, parameter stability outputs, and walk-forward summary.
 3. The phase stops after execution and reports walk-forward aggregated Sharpe, Monte Carlo p-value, top 3 parameter sets, and any warnings or anomalies.
 4. No Phase 11 work begins until the human explicitly approves it.
+
+**Plans**:
+1. `10-01-PLAN.md` - preflight validation, smoke-run setup, and operator workflow
+2. `10-02-PLAN.md` - smoke/full artifact interpretation and stop-gate findings
+3. `10-03-PLAN.md` - finalization robustness, walk-forward ranked results, and Windows timeout hardening
 
 ### Phase 11: Results Analysis and Strategy Refinement
 
@@ -81,4 +86,4 @@
 
 ## Next Step
 
-Start with `/gsd-discuss-phase 10` to prepare the full 5-year research run.
+Execute `/gsd-execute-phase 10` after Plan 03 review/approval to complete the smoke-run reliability fixes before resuming research runs.
