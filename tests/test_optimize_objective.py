@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from queue import Empty
+
 import optuna
 
 from mgc_bt.config import load_settings
 from mgc_bt.optimization.objective import OBJECTIVE_PENALTY
 from mgc_bt.optimization.objective import TrialEvaluator
+from mgc_bt.optimization.objective import _cleanup_timed_out_process
 from mgc_bt.optimization.objective import evaluate_params
 from mgc_bt.optimization.objective import compute_objective_score
 from mgc_bt.optimization.search_space import optimized_param_names
@@ -144,3 +147,109 @@ def test_evaluate_params_routes_walk_forward_windows_through_shared_runner(monke
     assert captured["params"]["end_date"] == "2022-02-01T00:00:00+00:00"
     assert captured["params"]["instrument_id"] is None
     assert result["evaluation_window"] == "validation"
+
+
+def test_cleanup_timed_out_process_uses_psutil_fallback_and_logs(monkeypatch, capsys) -> None:
+    class FakeProcess:
+        def __init__(self) -> None:
+            self.pid = 4242
+            self._alive = True
+
+        def terminate(self) -> None:
+            return None
+
+        def join(self, timeout=None) -> None:
+            return None
+
+        def is_alive(self) -> bool:
+            return self._alive
+
+        def kill(self) -> None:
+            self._alive = False
+
+    class FakeChild:
+        def kill(self) -> None:
+            return None
+
+    class FakePsProcess:
+        def children(self, recursive=False):
+            return [FakeChild()]
+
+        def kill(self) -> None:
+            return None
+
+    monkeypatch.setattr("mgc_bt.optimization.objective.psutil.Process", lambda pid: FakePsProcess())
+    monkeypatch.setattr("mgc_bt.optimization.objective.psutil.wait_procs", lambda procs, timeout=None: (procs, []))
+
+    process = FakeProcess()
+    cleanup = _cleanup_timed_out_process(process, timeout_seconds=10)
+    stderr = capsys.readouterr().err
+
+    assert cleanup == "psutil_kill"
+    assert "attempting terminate()" in stderr
+    assert "killing process tree via psutil" in stderr
+
+
+def test_run_backtest_trial_subprocess_timeout_returns_penalty_and_logs(monkeypatch, capsys, tmp_path) -> None:
+    settings = load_settings("configs/settings.toml")
+
+    class FakeQueue:
+        def get(self, timeout=None):
+            raise Empty
+
+        def cancel_join_thread(self) -> None:
+            return None
+
+        def close(self) -> None:
+            return None
+
+    class FakeProcess:
+        def __init__(self, target=None, args=None):
+            self.pid = 31337
+            self._alive = True
+            self.exitcode = None
+
+        def start(self) -> None:
+            return None
+
+        def join(self, timeout=None) -> None:
+            return None
+
+        def is_alive(self) -> bool:
+            return self._alive
+
+        def terminate(self) -> None:
+            return None
+
+        def kill(self) -> None:
+            self._alive = False
+
+        def close(self) -> None:
+            return None
+
+    class FakeContext:
+        def Queue(self):
+            return FakeQueue()
+
+        def Process(self, target=None, args=None):
+            return FakeProcess(target=target, args=args)
+
+    monkeypatch.setattr("mgc_bt.optimization.objective.multiprocessing.get_context", lambda method: FakeContext())
+    monkeypatch.setattr("mgc_bt.optimization.objective._cleanup_timed_out_process", lambda process, timeout_seconds: "psutil_kill")
+
+    from mgc_bt.optimization.objective import run_backtest_trial_subprocess
+
+    result = run_backtest_trial_subprocess(
+        settings,
+        {"instrument_id": None, "start_date": "2021-01-01T00:00:00+00:00", "end_date": "2021-01-02T00:00:00+00:00"},
+        start_date="2021-01-01T00:00:00+00:00",
+        end_date="2021-01-02T00:00:00+00:00",
+        evaluation_window="test",
+        payload_path=tmp_path / "payload.json",
+        timeout_seconds=10,
+    )
+    stderr = capsys.readouterr().err
+
+    assert result["sharpe_ratio"] == OBJECTIVE_PENALTY
+    assert "cleanup=psutil_kill" in result["error"]
+    assert stderr == ""

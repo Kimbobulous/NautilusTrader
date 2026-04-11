@@ -213,13 +213,53 @@ def write_best_run_config(settings: Settings, result: dict[str, Any], destinatio
     return config_path
 
 
-def write_optimization_manifest(run_dir: Path, *, latest_refreshed: bool) -> Path:
+def write_optimization_manifest(
+    run_dir: Path,
+    *,
+    latest_refreshed: bool,
+    run_status: str | None = None,
+    failed_stages: list[dict[str, Any]] | None = None,
+    stage_statuses: dict[str, str] | None = None,
+) -> Path:
     files = [path for path in run_dir.rglob("*") if path.is_file() and path.name != "manifest.json"]
-    return write_manifest(run_dir, files, latest_refreshed=latest_refreshed)
+    extra: dict[str, Any] = {}
+    if run_status is not None:
+        extra["run_status"] = run_status
+    if failed_stages is not None:
+        extra["failed_stages"] = failed_stages
+    if stage_statuses is not None:
+        extra["stage_statuses"] = stage_statuses
+    return write_manifest(run_dir, files, latest_refreshed=latest_refreshed, extra=extra or None)
 
 
 def write_optimization_tearsheet(run_dir: Path) -> Path:
     return write_tearsheet(run_dir)
+
+
+def write_walk_forward_ranked_results_csv(run_dir: Path, rows: list[dict[str, Any]]) -> Path:
+    csv_path = run_dir / "ranked_results.csv"
+    fieldnames = [
+        "window_index",
+        "trial_number",
+        "selected_for_test",
+        "objective_score",
+        "sharpe_ratio",
+        "training_objective_score",
+        "training_sharpe",
+        "validation_sharpe",
+        "validation_max_drawdown_pct",
+        "validation_total_pnl",
+        "test_sharpe",
+        "test_total_pnl",
+        "test_total_trades",
+        *[_param_column_name(name) for name in optimized_param_names()],
+    ]
+    with csv_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(row)
+    return csv_path
 
 
 def write_optimization_analytics(

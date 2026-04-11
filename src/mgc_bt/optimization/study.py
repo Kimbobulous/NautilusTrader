@@ -32,6 +32,7 @@ from mgc_bt.optimization.results import write_optimization_run_config
 from mgc_bt.optimization.results import write_optimization_summary_json
 from mgc_bt.optimization.results import write_ranked_results_csv
 from mgc_bt.optimization.results import write_best_run_bundle
+from mgc_bt.optimization.results import write_walk_forward_ranked_results_csv
 from mgc_bt.optimization.storage import optimization_storage_path
 from mgc_bt.optimization.storage import optimization_storage_url
 from mgc_bt.optimization.stability import run_stability_analysis
@@ -377,6 +378,18 @@ def _run_walk_forward_branch(
         "status": aggregate.status,
         "final_test_executed": walk_forward_run["final_test_result"] is not None,
     }
+    failed_stages: list[dict[str, str]] = []
+    stage_statuses: dict[str, str] = {}
+    latest_dir: Path | None = None
+    ranked_results_path: Path | None = None
+    summary_path: Path | None = None
+    run_config_path: Path | None = None
+    monte_carlo_paths = None
+    stability_paths = None
+    optimization_analytics_files: list[Path] = []
+    best_run_dir: Path | None = None
+    tearsheet_path: Path | None = None
+    best_window_result = walk_forward_run.get("best_run_result") if aggregate.selected_params else None
     try:
         artifact_paths = write_walk_forward_artifacts(
             run_dir,
@@ -384,7 +397,14 @@ def _run_walk_forward_branch(
             [_window_result_row(item) for item in window_results],
             final_test_result=walk_forward_run["final_test_result"],
         )
+        stage_statuses["walk_forward"] = "completed"
         write_failed_trials_json(run_dir, walk_forward_run["failed_trials"])
+        stage_statuses["failed_trials"] = "completed"
+        ranked_results_path = write_walk_forward_ranked_results_csv(
+            run_dir,
+            walk_forward_run.get("candidate_rows", []),
+        )
+        stage_statuses["ranked_results"] = "completed"
         summary = {
             "study_name": effective_study_name,
             "seed": settings.optimization.seed,
@@ -403,54 +423,9 @@ def _run_walk_forward_branch(
             },
             "overfit_warning": False,
         }
-        monte_carlo_paths = None
-        monte_carlo_status = _analysis_status(
-            enabled=analysis_flags["monte_carlo_enabled"],
-            skipped_by_flag=False,
-        )
-        if analysis_flags["monte_carlo_enabled"]:
-            monte_carlo_result = run_monte_carlo_analysis(
-                aggregate.aggregated_trade_log,
-                simulations=settings.monte_carlo.simulations,
-                seed=settings.optimization.seed + settings.monte_carlo.random_seed_offset,
-                percentiles=settings.monte_carlo.percentile_points,
-                confidence_level=settings.monte_carlo.confidence_level,
-            )
-            monte_carlo_paths = write_monte_carlo_artifacts(run_dir, monte_carlo_result)
-        stability_paths = None
-        stability_status = _analysis_status(
-            enabled=analysis_flags["stability_enabled"],
-            skipped_by_flag=False,
-        )
-        if analysis_flags["stability_enabled"]:
-            stability_result = run_stability_analysis(
-                settings=settings,
-                study=_study_from_trials(walk_forward_run.get("training_trials", []), settings.optimization.direction),
-                best_params=_strip_window_index(aggregate.selected_params[-1]) if aggregate.selected_params else {},
-                evaluation_context={
-                    "mode": "walk_forward",
-                    "windows": [
-                        {"start": item.test_start, "end": item.test_end}
-                        for item in window_results
-                        if item.status != "skipped"
-                    ],
-                    "min_test_trades": settings.walk_forward.min_test_trades,
-                },
-            )
-            stability_paths = write_stability_artifacts(run_dir, stability_result)
-        optimization_analytics_files = []
-        best_window_result = walk_forward_run.get("best_run_result") if aggregate.selected_params else None
-        try:
-            optimization_analytics_files = write_optimization_analytics(
-                run_dir,
-                ranked_rows=[],
-                best_run_result=best_window_result,
-            )
-        except Exception as exc:
-            output.write(f"Warning: optimization analytics generation failed: {exc}\n")
-            output.flush()
         _attach_phase_six_metadata(summary, analysis_flags, final_test_window)
         summary_path = write_optimization_summary_json(run_dir, summary)
+        stage_statuses["optimization_summary"] = "completed"
         run_config_path = write_optimization_run_config(
             settings,
             run_dir,
@@ -458,20 +433,163 @@ def _run_walk_forward_branch(
             analysis_flags=analysis_flags,
             final_test_window=final_test_window,
         )
-        best_run_dir = None
+        stage_statuses["run_config"] = "completed"
+        _write_walk_forward_manifest(
+            run_dir,
+            refresh_latest=refresh_latest,
+            stage_statuses=stage_statuses,
+            failed_stages=failed_stages,
+            run_status="core_artifacts_written",
+        )
+        monte_carlo_paths = None
+        monte_carlo_status = _analysis_status(
+            enabled=analysis_flags["monte_carlo_enabled"],
+            skipped_by_flag=False,
+        )
+        if analysis_flags["monte_carlo_enabled"]:
+            try:
+                monte_carlo_result = run_monte_carlo_analysis(
+                    aggregate.aggregated_trade_log,
+                    simulations=settings.monte_carlo.simulations,
+                    seed=settings.optimization.seed + settings.monte_carlo.random_seed_offset,
+                    percentiles=settings.monte_carlo.percentile_points,
+                    confidence_level=settings.monte_carlo.confidence_level,
+                )
+                monte_carlo_paths = write_monte_carlo_artifacts(run_dir, monte_carlo_result)
+                stage_statuses["monte_carlo"] = "completed"
+            except Exception as exc:
+                monte_carlo_status = "failed"
+                _record_failed_stage(
+                    output,
+                    failed_stages=failed_stages,
+                    stage_statuses=stage_statuses,
+                    stage_name="monte_carlo",
+                    error=exc,
+                    warning_prefix="Warning: Monte Carlo analysis failed",
+                )
+            _write_walk_forward_manifest(
+                run_dir,
+                refresh_latest=refresh_latest,
+                stage_statuses=stage_statuses,
+                failed_stages=failed_stages,
+                run_status="finalizing",
+            )
+        stability_paths = None
+        stability_status = _analysis_status(
+            enabled=analysis_flags["stability_enabled"],
+            skipped_by_flag=False,
+        )
+        if analysis_flags["stability_enabled"]:
+            try:
+                stability_result = run_stability_analysis(
+                    settings=settings,
+                    study=_study_from_trials(walk_forward_run.get("training_trials", []), settings.optimization.direction),
+                    best_params=_strip_window_index(aggregate.selected_params[-1]) if aggregate.selected_params else {},
+                    evaluation_context={
+                        "mode": "walk_forward",
+                        "windows": [
+                            {"start": item.test_start, "end": item.test_end}
+                            for item in window_results
+                            if item.status != "skipped"
+                        ],
+                        "min_test_trades": settings.walk_forward.min_test_trades,
+                    },
+                )
+                stability_paths = write_stability_artifacts(run_dir, stability_result)
+                stage_statuses["stability"] = "completed"
+            except Exception as exc:
+                stability_status = "failed"
+                _record_failed_stage(
+                    output,
+                    failed_stages=failed_stages,
+                    stage_statuses=stage_statuses,
+                    stage_name="stability",
+                    error=exc,
+                    warning_prefix="Warning: stability analysis failed",
+                )
+            _write_walk_forward_manifest(
+                run_dir,
+                refresh_latest=refresh_latest,
+                stage_statuses=stage_statuses,
+                failed_stages=failed_stages,
+                run_status="finalizing",
+            )
         if best_window_result is not None:
-            best_run_dir = run_dir / "best_run"
-            write_best_run_bundle(settings, best_window_result, best_run_dir)
-        tearsheet_path = None
+            try:
+                best_run_dir = run_dir / "best_run"
+                write_best_run_bundle(settings, best_window_result, best_run_dir)
+                stage_statuses["best_run"] = "completed"
+            except Exception as exc:
+                _record_failed_stage(
+                    output,
+                    failed_stages=failed_stages,
+                    stage_statuses=stage_statuses,
+                    stage_name="best_run",
+                    error=exc,
+                    warning_prefix="Warning: best-run bundle generation failed",
+                )
+            _write_walk_forward_manifest(
+                run_dir,
+                refresh_latest=refresh_latest,
+                stage_statuses=stage_statuses,
+                failed_stages=failed_stages,
+                run_status="finalizing",
+            )
         try:
-            tearsheet_path = write_optimization_tearsheet(run_dir)
-        except FileNotFoundError as exc:
-            output.write(f"Warning: tearsheet generation failed for optimization run: {exc}\n")
-            output.flush()
+            optimization_analytics_files = write_optimization_analytics(
+                run_dir,
+                ranked_rows=walk_forward_run.get("candidate_rows", []),
+                best_run_result=best_window_result,
+            )
+            stage_statuses["optimization_analytics"] = "completed"
         except Exception as exc:
-            output.write(f"Warning: tearsheet generation failed for optimization run: {exc}\n")
-            output.flush()
-        write_optimization_manifest(run_dir, latest_refreshed=refresh_latest)
+            _record_failed_stage(
+                output,
+                failed_stages=failed_stages,
+                stage_statuses=stage_statuses,
+                stage_name="optimization_analytics",
+                error=exc,
+                warning_prefix="Warning: optimization analytics generation failed",
+            )
+        _write_walk_forward_manifest(
+            run_dir,
+            refresh_latest=refresh_latest,
+            stage_statuses=stage_statuses,
+            failed_stages=failed_stages,
+            run_status="finalizing",
+        )
+        if best_window_result is not None:
+            try:
+                tearsheet_path = write_optimization_tearsheet(run_dir)
+                stage_statuses["tearsheet"] = "completed"
+            except FileNotFoundError as exc:
+                _record_failed_stage(
+                    output,
+                    failed_stages=failed_stages,
+                    stage_statuses=stage_statuses,
+                    stage_name="tearsheet",
+                    error=exc,
+                    warning_prefix="Warning: tearsheet generation failed for optimization run",
+                )
+            except Exception as exc:
+                _record_failed_stage(
+                    output,
+                    failed_stages=failed_stages,
+                    stage_statuses=stage_statuses,
+                    stage_name="tearsheet",
+                    error=exc,
+                    warning_prefix="Warning: tearsheet generation failed for optimization run",
+                )
+        else:
+            stage_statuses["tearsheet"] = "skipped"
+        run_status = "completed" if not failed_stages else "completed_with_failures"
+        _write_walk_forward_manifest(
+            run_dir,
+            refresh_latest=refresh_latest,
+            stage_statuses=stage_statuses,
+            failed_stages=failed_stages,
+            run_status=run_status,
+        )
         latest_dir = refresh_latest_results(run_dir) if refresh_latest else None
         return {
             "run_dir": run_dir,
@@ -479,6 +597,7 @@ def _run_walk_forward_branch(
             "summary_path": summary_path,
             "run_config_path": run_config_path,
             "tearsheet_path": tearsheet_path,
+            "ranked_results_path": ranked_results_path,
             "storage_path": storage_path,
             "study_name": effective_study_name,
             "seed": settings.optimization.seed,
@@ -498,6 +617,9 @@ def _run_walk_forward_branch(
             "stability_summary_path": stability_paths["summary_path"] if stability_paths else None,
             "stability_status": stability_status,
             "analytics_dir": run_dir / "analytics" if optimization_analytics_files else None,
+            "manifest_path": run_dir / "manifest.json",
+            "failed_stages": failed_stages,
+            "run_status": run_status,
         }
     finally:
         shutil.rmtree(temp_root, ignore_errors=True)
@@ -710,3 +832,35 @@ def _study_from_trials(
 
 def _strip_window_index(params: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in params.items() if key != "window_index"}
+
+
+def _record_failed_stage(
+    output: TextIO,
+    *,
+    failed_stages: list[dict[str, str]],
+    stage_statuses: dict[str, str],
+    stage_name: str,
+    error: Exception,
+    warning_prefix: str,
+) -> None:
+    stage_statuses[stage_name] = "failed"
+    failed_stages.append({"stage": stage_name, "error": f"{type(error).__name__}: {error}"})
+    output.write(f"{warning_prefix}: {error}\n")
+    output.flush()
+
+
+def _write_walk_forward_manifest(
+    run_dir: Path,
+    *,
+    refresh_latest: bool,
+    stage_statuses: dict[str, str],
+    failed_stages: list[dict[str, str]],
+    run_status: str,
+) -> Path:
+    return write_optimization_manifest(
+        run_dir,
+        latest_refreshed=refresh_latest,
+        stage_statuses=dict(stage_statuses),
+        failed_stages=list(failed_stages),
+        run_status=run_status,
+    )

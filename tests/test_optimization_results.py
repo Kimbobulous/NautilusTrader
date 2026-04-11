@@ -453,6 +453,70 @@ def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -
                     selected_params={"supertrend_factor": 2.0},
                 ),
             ],
+            "candidate_rows": [
+                {
+                    "window_index": 1,
+                    "trial_number": 0,
+                    "selected_for_test": True,
+                    "training_objective_score": 1.2,
+                    "training_sharpe": 1.2,
+                    "validation_sharpe": 1.1,
+                    "validation_max_drawdown_pct": 9.0,
+                    "validation_total_pnl": 1000.0,
+                    "test_sharpe": 0.9,
+                    "test_total_pnl": 800.0,
+                    "test_total_trades": 20,
+                    "param_supertrend_atr_length": 10,
+                    "param_supertrend_factor": 2.5,
+                    "param_supertrend_training_period": 100,
+                    "param_vwap_reset_hour_utc": 0,
+                    "param_wavetrend_n1": 10,
+                    "param_wavetrend_n2": 21,
+                    "param_wavetrend_ob_level": 2.0,
+                    "param_delta_imbalance_threshold": 0.3,
+                    "param_absorption_volume_multiplier": 1.2,
+                    "param_absorption_range_multiplier": 0.5,
+                    "param_volume_lookback": 20,
+                    "param_atr_trail_length": 14,
+                    "param_atr_trail_multiplier": 2.0,
+                    "param_min_pullback_bars": 3,
+                    "param_max_loss_per_trade_dollars": 150.0,
+                    "param_max_daily_loss_dollars": 300.0,
+                    "param_max_consecutive_losses": 4,
+                    "param_max_drawdown_pct": 5.0,
+                },
+                {
+                    "window_index": 1,
+                    "trial_number": 1,
+                    "selected_for_test": False,
+                    "training_objective_score": 0.8,
+                    "training_sharpe": 0.8,
+                    "validation_sharpe": 0.7,
+                    "validation_max_drawdown_pct": 11.0,
+                    "validation_total_pnl": 600.0,
+                    "test_sharpe": None,
+                    "test_total_pnl": None,
+                    "test_total_trades": None,
+                    "param_supertrend_atr_length": 11,
+                    "param_supertrend_factor": 2.0,
+                    "param_supertrend_training_period": 100,
+                    "param_vwap_reset_hour_utc": 0,
+                    "param_wavetrend_n1": 10,
+                    "param_wavetrend_n2": 21,
+                    "param_wavetrend_ob_level": 2.0,
+                    "param_delta_imbalance_threshold": 0.4,
+                    "param_absorption_volume_multiplier": 1.3,
+                    "param_absorption_range_multiplier": 0.6,
+                    "param_volume_lookback": 25,
+                    "param_atr_trail_length": 14,
+                    "param_atr_trail_multiplier": 2.5,
+                    "param_min_pullback_bars": 4,
+                    "param_max_loss_per_trade_dollars": 175.0,
+                    "param_max_daily_loss_dollars": 325.0,
+                    "param_max_consecutive_losses": 5,
+                    "param_max_drawdown_pct": 6.0,
+                },
+            ],
             "aggregate": WalkForwardAggregateSummary(
                 completed_window_count=1,
                 skipped_window_count=0,
@@ -501,6 +565,7 @@ def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -
     result = run_optimization(settings, study_name="wf-test", max_trials=2, walk_forward=True)
 
     walk_root = result["run_dir"] / "walk_forward"
+    assert (result["run_dir"] / "ranked_results.csv").exists()
     assert (walk_root / "window_results.csv").exists()
     assert (walk_root / "aggregated_summary.json").exists()
     assert (walk_root / "equity_curve.png").exists()
@@ -535,6 +600,149 @@ def test_run_optimization_writes_walk_forward_artifacts(tmp_path, monkeypatch) -
     )
     assert stability_payload["schema_version"] == 1
     assert stability_payload["analysis_type"] == "stability"
+    with (result["run_dir"] / "ranked_results.csv").open("r", encoding="utf-8", newline="") as handle:
+        rows = list(csv.DictReader(handle))
+    assert rows[0]["window_index"] == "1"
+    assert rows[0]["selected_for_test"] == "True"
+    assert rows[1]["test_sharpe"] == ""
+
+
+def test_walk_forward_finalization_writes_manifest_and_core_outputs_when_stability_fails(tmp_path, monkeypatch, capsys) -> None:
+    settings = _temp_settings(tmp_path)
+
+    monkeypatch.setattr(
+        "mgc_bt.optimization.study.run_walk_forward_optimization",
+        lambda *args, **kwargs: {
+            "windows": [],
+            "failed_trials": [],
+            "final_test_result": None,
+            "window_results": [
+                WalkForwardWindowResult(
+                    window_index=1,
+                    train_start="2021-01-01T00:00:00+00:00",
+                    train_end="2022-01-01T00:00:00+00:00",
+                    validation_start="2022-01-01T00:00:00+00:00",
+                    validation_end="2022-04-01T00:00:00+00:00",
+                    test_start="2022-04-01T00:00:00+00:00",
+                    test_end="2022-07-01T00:00:00+00:00",
+                    status="completed",
+                    skipped_reason=None,
+                    inconclusive=False,
+                    training_bar_count=60000,
+                    training_completed_trials=3,
+                    training_sharpe=1.2,
+                    validation_sharpe=1.1,
+                    validation_max_drawdown_pct=9.0,
+                    validation_total_pnl=1000.0,
+                    test_sharpe=0.9,
+                    test_total_pnl=800.0,
+                    test_total_trades=20,
+                    test_bar_count=15000,
+                    selected_params={"supertrend_factor": 2.5},
+                ),
+            ],
+            "candidate_rows": [
+                {
+                    "window_index": 1,
+                    "trial_number": 0,
+                    "selected_for_test": True,
+                    "training_objective_score": 1.2,
+                    "training_sharpe": 1.2,
+                    "validation_sharpe": 1.1,
+                    "validation_max_drawdown_pct": 9.0,
+                    "validation_total_pnl": 1000.0,
+                    "test_sharpe": 0.9,
+                    "test_total_pnl": 800.0,
+                    "test_total_trades": 20,
+                    "param_supertrend_atr_length": 10,
+                    "param_supertrend_factor": 2.5,
+                    "param_supertrend_training_period": 100,
+                    "param_vwap_reset_hour_utc": 0,
+                    "param_wavetrend_n1": 10,
+                    "param_wavetrend_n2": 21,
+                    "param_wavetrend_ob_level": 2.0,
+                    "param_delta_imbalance_threshold": 0.3,
+                    "param_absorption_volume_multiplier": 1.2,
+                    "param_absorption_range_multiplier": 0.5,
+                    "param_volume_lookback": 20,
+                    "param_atr_trail_length": 14,
+                    "param_atr_trail_multiplier": 2.0,
+                    "param_min_pullback_bars": 3,
+                    "param_max_loss_per_trade_dollars": 150.0,
+                    "param_max_daily_loss_dollars": 300.0,
+                    "param_max_consecutive_losses": 4,
+                    "param_max_drawdown_pct": 5.0,
+                },
+            ],
+            "aggregate": WalkForwardAggregateSummary(
+                completed_window_count=1,
+                skipped_window_count=0,
+                inconclusive_window_count=0,
+                aggregated_oos_sharpe=0.9,
+                aggregated_oos_total_pnl=800.0,
+                aggregated_equity_curve=[
+                    {"timestamp": "2022-04-01T00:00:00+00:00", "equity": 50000.0},
+                    {"timestamp": "2022-07-01T00:00:00+00:00", "equity": 50800.0},
+                ],
+                selected_params=[{"window_index": 1, "supertrend_factor": 2.5}],
+                status="completed",
+                aggregated_trade_log=[{"realized_pnl": 100.0}],
+            ),
+            "best_run_result": {
+                "mode": "auto_roll",
+                "instrument_id": "AUTO_ROLL:MGC",
+                "segment_instruments": ["MGCJ1.GLBX"],
+                "segment_count": 1,
+                "start_date": "2022-04-01T00:00:00+00:00",
+                "end_date": "2022-07-01T00:00:00+00:00",
+                "total_pnl": 800.0,
+                "sharpe_ratio": 0.9,
+                "win_rate": 55.0,
+                "max_drawdown": 250.0,
+                "max_drawdown_pct": 10.0,
+                "total_trades": 20,
+                "parameters": {"supertrend_factor": 2.5},
+                "segments": [],
+                "trade_log": [],
+                "equity_curve": [
+                    {"timestamp": "2022-04-01T00:00:00+00:00", "equity": 50000.0},
+                    {"timestamp": "2022-07-01T00:00:00+00:00", "equity": 50800.0},
+                ],
+            },
+            "training_trials": [],
+        },
+    )
+    monkeypatch.setattr(
+        "mgc_bt.optimization.study.run_stability_analysis",
+        lambda *args, **kwargs: (_ for _ in ()).throw(RuntimeError("stability blew up")),
+    )
+    monkeypatch.setattr(
+        "mgc_bt.optimization.study.run_monte_carlo_analysis",
+        lambda *args, **kwargs: {
+            "permutation": {"p_value": 0.4, "pass_95": False},
+            "bootstrap": {},
+            "confidence_bands": [{"trade_index": 0, "p05": 1, "p25": 2, "p50": 3, "p75": 4, "p95": 5}],
+            "simulations": 1000,
+            "sample_size": 1,
+            "percentiles": [5, 25, 50, 75, 95],
+            "status": "completed",
+        },
+    )
+
+    result = run_optimization(settings, study_name="wf-stability-fail", max_trials=2, walk_forward=True)
+    stdout = capsys.readouterr().out
+
+    assert "Warning: stability analysis failed" in stdout
+    assert (result["run_dir"] / "walk_forward" / "window_results.csv").exists()
+    assert (result["run_dir"] / "walk_forward" / "aggregated_summary.json").exists()
+    assert (result["run_dir"] / "failed_trials.json").exists()
+    assert (result["run_dir"] / "optimization_summary.json").exists()
+    assert (result["run_dir"] / "run_config.toml").exists()
+    manifest_payload = json.loads((result["run_dir"] / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest_payload["run_status"] == "completed_with_failures"
+    assert manifest_payload["stage_statuses"]["stability"] == "failed"
+    assert manifest_payload["failed_stages"][0]["stage"] == "stability"
+    assert "ranked_results.csv" in manifest_payload["files"]
 
 
 def _temp_settings(tmp_path: Path):

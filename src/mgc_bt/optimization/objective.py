@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import contextlib
 import json
 import multiprocessing
 from pathlib import Path
 from queue import Empty
+import sys
 from typing import Any
 
 import optuna
+import psutil
 
 from mgc_bt.backtest.runner import run_backtest
 from mgc_bt.config import Settings
@@ -83,23 +86,29 @@ def run_backtest_trial_subprocess(
     process.join(timeout_seconds)
 
     error: str | None = None
-    if process.is_alive():
-        process.terminate()
-        process.join(5)
-        error = f"TimeoutError: evaluation exceeded {timeout_seconds} seconds"
-    else:
-        try:
-            message = queue.get_nowait()
-        except Empty:
-            message = None
-        if message is None:
-            error = f"RuntimeError: evaluation process exited with code {process.exitcode}"
-        elif not message.get("ok", False):
-            error = str(message.get("error", "RuntimeError: unknown subprocess error"))
+    try:
+        if process.is_alive():
+            cleanup_method = _cleanup_timed_out_process(process, timeout_seconds=timeout_seconds)
+            error = (
+                f"TimeoutError: evaluation exceeded {timeout_seconds} seconds "
+                f"(cleanup={cleanup_method})"
+            )
         else:
-            result = dict(message["result"])
-            result["evaluation_window"] = evaluation_window
-            return result
+            try:
+                message = queue.get(timeout=1)
+            except Empty:
+                message = None
+            if message is None:
+                error = f"RuntimeError: evaluation process exited with code {process.exitcode}"
+            elif not message.get("ok", False):
+                error = str(message.get("error", "RuntimeError: unknown subprocess error"))
+            else:
+                result = dict(message["result"])
+                result["evaluation_window"] = evaluation_window
+                return result
+    finally:
+        _close_queue_safely(queue)
+        _close_process_safely(process)
 
     return {
         "mode": "evaluation_failed",
@@ -119,6 +128,66 @@ def run_backtest_trial_subprocess(
         "error": error,
         "payload_path": payload_path.as_posix() if payload_path is not None else None,
     }
+
+
+def _cleanup_timed_out_process(
+    process: multiprocessing.Process,
+    *,
+    timeout_seconds: int,
+    terminate_wait_seconds: int = 5,
+    kill_wait_seconds: int = 5,
+) -> str:
+    pid = process.pid
+    _log_timeout_event(
+        f"Trial subprocess timed out after {timeout_seconds}s (pid={pid}); attempting terminate().",
+    )
+    process.terminate()
+    process.join(terminate_wait_seconds)
+    if not process.is_alive():
+        _log_timeout_event(f"Trial subprocess pid={pid} exited after terminate().")
+        return "terminate"
+
+    _log_timeout_event(
+        f"Trial subprocess pid={pid} did not exit after terminate(); killing process tree via psutil.",
+    )
+    try:
+        parent = psutil.Process(pid)
+        descendants = parent.children(recursive=True)
+        for child in descendants:
+            with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied):
+                child.kill()
+        with contextlib.suppress(psutil.NoSuchProcess, psutil.AccessDenied):
+            parent.kill()
+        psutil.wait_procs([*descendants, parent], timeout=kill_wait_seconds)
+    except (psutil.Error, ProcessLookupError) as exc:
+        _log_timeout_event(
+            f"psutil cleanup fallback for pid={pid} hit {type(exc).__name__}: {exc}; attempting kill().",
+        )
+    with contextlib.suppress(Exception):
+        if process.is_alive():
+            process.kill()
+            process.join(kill_wait_seconds)
+    if process.is_alive():
+        _log_timeout_event(f"Trial subprocess pid={pid} remained alive after kill attempts.")
+        return "cleanup_failed"
+    _log_timeout_event(f"Trial subprocess pid={pid} killed via psutil process-tree cleanup.")
+    return "psutil_kill"
+
+
+def _log_timeout_event(message: str) -> None:
+    print(message, file=sys.stderr, flush=True)
+
+
+def _close_queue_safely(queue: multiprocessing.queues.Queue) -> None:
+    with contextlib.suppress(Exception):
+        queue.cancel_join_thread()
+    with contextlib.suppress(Exception):
+        queue.close()
+
+
+def _close_process_safely(process: multiprocessing.Process) -> None:
+    with contextlib.suppress(Exception):
+        process.close()
 
 
 def evaluate_params(

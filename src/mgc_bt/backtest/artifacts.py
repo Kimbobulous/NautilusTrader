@@ -251,6 +251,7 @@ def write_manifest(
     files: Iterable[Path],
     *,
     latest_refreshed: bool | None,
+    extra: dict[str, Any] | None = None,
 ) -> Path:
     manifest_path = run_dir / "manifest.json"
     payload: dict[str, Any] = {
@@ -259,6 +260,8 @@ def write_manifest(
     }
     if latest_refreshed is not None:
         payload["latest_refreshed"] = latest_refreshed
+    if extra:
+        payload.update(extra)
     manifest_path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
     return manifest_path
 

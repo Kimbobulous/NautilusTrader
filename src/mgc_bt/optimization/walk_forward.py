@@ -22,6 +22,7 @@ from mgc_bt.backtest.contracts import resolve_contract_selection
 from mgc_bt.config import Settings
 from mgc_bt.optimization.objective import TrialEvaluator
 from mgc_bt.optimization.objective import evaluate_params
+from mgc_bt.optimization.search_space import optimized_param_names
 
 
 @dataclass(frozen=True)
@@ -125,6 +126,7 @@ def run_walk_forward_optimization(
     window_results: list[WalkForwardWindowResult] = []
     failed_trials: list[dict[str, Any]] = []
     training_trials: list[optuna.trial.FrozenTrial] = []
+    candidate_rows: list[dict[str, Any]] = []
     aggregate_buffers = _AggregateBuffers()
     temp_result_paths: dict[int, Path] = {}
     cumulative_oos_pnl = 0.0
@@ -226,11 +228,12 @@ def run_walk_forward_optimization(
             completed_trials,
             key=lambda trial: float(trial.value) if trial.value is not None else float("-inf"),
         )
-        selected = _select_validation_candidate(
+        selection = _select_validation_candidate(
             settings,
             completed_trials,
             window=window,
         )
+        selected = selection["selected"]
         temp_path = temp_root / f"window_{window.index:02d}_result.json"
         test_result = evaluate_params(
             settings,
@@ -248,6 +251,14 @@ def run_walk_forward_optimization(
             cumulative_oos_pnl += float(test_result.get("total_pnl", 0.0))
             if aggregate_buffers.best_run_result is None and temp_path.exists():
                 aggregate_buffers.best_run_result = _merge_payload_result(test_result, temp_path)
+        candidate_rows.extend(
+            _candidate_rows_for_window(
+                window=window,
+                candidates=selection["candidates"],
+                selected_trial_number=selected["trial_number"],
+                test_result=test_result,
+            ),
+        )
         result = WalkForwardWindowResult(
             window_index=window.index,
             train_start=window.train_start,
@@ -293,6 +304,7 @@ def run_walk_forward_optimization(
         "failed_trials": failed_trials,
         "final_test_result": final_test_result,
         "training_trials": training_trials,
+        "candidate_rows": candidate_rows,
         "best_run_result": aggregate_buffers.best_run_result,
         "temp_root": temp_root,
         "temp_result_paths": temp_result_paths,
@@ -330,7 +342,10 @@ def _select_validation_candidate(
         )
         candidates.append(
             {
+                "trial_number": trial.number,
                 "params": dict(trial.params),
+                "training_objective_score": float(trial.value) if trial.value is not None else None,
+                "training_sharpe": _float_or_none(trial.user_attrs.get("sharpe_ratio")),
                 "validation_result": validation_result,
                 "validation_sharpe": _float_or_none(validation_result.get("sharpe_ratio")) or float("-inf"),
                 "validation_max_drawdown_pct": _float_or_none(validation_result.get("max_drawdown_pct")) or float("inf"),
@@ -344,7 +359,41 @@ def _select_validation_candidate(
             -item["validation_total_pnl"],
         ),
     )
-    return candidates[0]
+    return {"selected": candidates[0], "candidates": candidates}
+
+
+def _candidate_rows_for_window(
+    *,
+    window: WalkForwardWindow,
+    candidates: list[dict[str, Any]],
+    selected_trial_number: int,
+    test_result: dict[str, Any],
+) -> list[dict[str, Any]]:
+    rows: list[dict[str, Any]] = []
+    for candidate in candidates:
+        row = {
+            "window_index": window.index,
+            "trial_number": candidate["trial_number"],
+            "selected_for_test": candidate["trial_number"] == selected_trial_number,
+            "objective_score": candidate["training_objective_score"],
+            "sharpe_ratio": _float_or_none(candidate["validation_result"].get("sharpe_ratio")),
+            "training_objective_score": candidate["training_objective_score"],
+            "training_sharpe": candidate["training_sharpe"],
+            "validation_sharpe": _float_or_none(candidate["validation_result"].get("sharpe_ratio")),
+            "validation_max_drawdown_pct": _float_or_none(candidate["validation_result"].get("max_drawdown_pct")),
+            "validation_total_pnl": _float_or_none(candidate["validation_result"].get("total_pnl")),
+            "test_sharpe": None,
+            "test_total_pnl": None,
+            "test_total_trades": None,
+        }
+        for name in optimized_param_names():
+            row[f"param_{name}"] = candidate["params"].get(name)
+        if candidate["trial_number"] == selected_trial_number:
+            row["test_sharpe"] = _float_or_none(test_result.get("sharpe_ratio"))
+            row["test_total_pnl"] = _float_or_none(test_result.get("total_pnl"))
+            row["test_total_trades"] = int(test_result.get("total_trades", 0))
+        rows.append(row)
+    return rows
 
 
 def _aggregate_walk_forward(
